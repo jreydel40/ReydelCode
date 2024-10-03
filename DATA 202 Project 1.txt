@@ -1,0 +1,98 @@
+﻿CREATE SCHEMA p1;
+
+
+SET search_path TO p1;
+
+
+CREATE TABLE customers (
+    customer_id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    email VARCHAR(75) NOT NULL,
+    phone VARCHAR(10) NOT NULL,
+    address VARCHAR(100) NOT NULL,
+   city VARCHAR(100) NOT NULL,
+    state CHAR(2) NOT NULL,
+    zip CHAR(5),
+    credit_card VARCHAR(16) NOT NULL
+);
+
+
+INSERT INTO customers (name, email, phone, address, city, state, zip, credit_card)
+VALUES
+    ('Jackson Reydel', 'jackson.reydel@tufts.edu', '5088587951', '68 Wareham Street', 'Medford', 'MA', '02155', '1234567890123456');
+
+
+CREATE TABLE restaurants (
+    restaurant_id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    address VARCHAR(100) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state CHAR(2) NOT NULL,
+    zip CHAR(5),
+    cuisineType VARCHAR(25) NOT NULL,
+    phone VARCHAR(10) NOT NULL
+);
+
+
+INSERT INTO restaurants (name, address, city, state, zip, cuisineType, phone)
+VALUES
+    ('Pasta Palace', '123 Main St', 'Medford', 'MA', '02155', 'Italian', '555-1234')
+
+
+CREATE TABLE menu(        
+    item_id SERIAL PRIMARY KEY,
+    item_name VARCHAR(100) NOT NULL,
+    item_description VARCHAR(200),
+    item_price NUMERIC(5, 2) NOT NULL,
+    restaurant VARCHAR(100) NOT NULL,
+    available BOOLEAN,
+    CONSTRAINT unique_item_per_restaurant UNIQUE (item_name, restaurant)
+);
+
+
+INSERT INTO menu (item_name, item_description, item_price, restaurant, available)
+VALUES
+    ('Spaghetti Bolognese', 'Classic spaghetti with meat sauce', 12.99, 'Pasta Palace', true),
+    ('Fettuccine Alfredo', 'Creamy alfredo sauce with fettuccine pasta', 14.99, 'Pasta Palace', true),
+    ('Chicken Parmesan', 'Breaded chicken topped with marinara sauce and melted cheese', 16.99, 'Pasta Palace', true),
+    ('Margherita Pizza', 'Classic pizza with tomato, mozzarella, and basil', 10.99, 'Pasta Palace', true),
+    ('Tiramisu', 'Traditional Italian dessert made with coffee-soaked ladyfingers and mascarpone cheese', 8.99, 'Pasta Palace', true);
+
+
+
+
+CREATE TABLE order_items (
+    order_item_id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    item_id INTEGER NOT NULL,
+    Quantity INTEGER NOT NULL,
+   
+);
+
+
+INSERT INTO order_items (order_id, item_id, Quantity)
+VALUES
+    (1, 1, 2),  -- Order 1: 2x Spaghetti Bolognese
+    (1, 4, 1),  -- Order 1: 1x Margherita Pizza
+    (2, 2, 1),  -- Order 2: 1x Fettuccine Alfredo
+    (3, 3, 2),  -- Order 3: 2x Chicken Parmesan
+    (3, 5, 3);  -- Order 3: 3x Tiramisu
+
+
+CREATE TABLE orders (
+    order_id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        order_item_id INTEGER NOT NULL,
+    delivery_address VARCHAR(200),
+driver_id INTEGER NOT NULL,
+        driver_name VARCHAR(50) NOT NULL,
+        driver_license_plate VARCHAR(50) NOT NULL,
+        driver_fee NUMERIC(4,2) NOT NULL,
+    status VARCHAR(10)
+);
+
+
+INSERT INTO orders (customer_id, order_item_id, delivery_address, driver_id, driver_name, driver_license_plate, driver_fee, status)
+VALUES
+(123, 7, '68 Wareham Street, Medford, MA, 02155', 412, 'Dave', '4176JK', 3.47, 'Delivered');

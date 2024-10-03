@@ -1,0 +1,243 @@
+﻿CREATE SCHEMA p2;
+
+
+SET search_path TO p2;
+
+
+CREATE TABLE sales (
+    sale_id INT PRIMARY KEY,
+    sale_date DATE NOT NULL,
+    total_amount NUMERIC(10, 2) NOT NULL
+);
+
+
+CREATE TABLE sale_items (
+    sale_item_id INT PRIMARY KEY,
+    sale_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price NUMERIC(5, 2) NOT NULL,
+    CONSTRAINT fk_sales FOREIGN KEY (sale_id) REFERENCES sales (sale_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE products (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(30) NOT NULL,
+    price NUMERIC(5, 2) NOT NULL,
+    quantity_in_stock INT NOT NULL,
+    reorder_point INT NOT NULL
+);
+
+
+CREATE TABLE financial_records (
+    record_id INT PRIMARY KEY,
+    record_date DATE NOT NULL,
+    description VARCHAR(100),
+    amount NUMERIC(8, 2) NOT NULL
+);
+
+
+CREATE TABLE employees (
+    employee_id INT PRIMARY KEY,
+    employee_name VARCHAR(40) NOT NULL,
+    position VARCHAR(40) NOT NULL,
+    hourly_rate NUMERIC(5, 2) NOT NULL
+);
+
+
+CREATE TABLE timecards (
+    timecard_id INT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    work_date DATE NOT NULL,
+    hours_worked NUMERIC(4, 2) NOT NULL,
+    CONSTRAINT fk_employees FOREIGN KEY (employee_id) REFERENCES employees (employee_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE customers (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(40) NOT NULL,
+    email VARCHAR(40),
+    phone VARCHAR(12)
+);
+
+
+CREATE TABLE transactions (
+    transaction_id INT PRIMARY KEY,
+    customer_id INT,
+    transaction_date DATE NOT NULL,
+    total_amount NUMERIC(6, 2) NOT NULL,
+    CONSTRAINT fk_customers FOREIGN KEY (customer_id) REFERENCES customers (customer_id) ON DELETE SET NULL
+);
+
+
+CREATE TABLE suppliers (
+    supplier_id INT PRIMARY KEY,
+    supplier_name VARCHAR(40) NOT NULL,
+    contact_name VARCHAR(40),
+    phone VARCHAR(12),
+    email VARCHAR(40)
+);
+
+
+CREATE TABLE purchase_orders (
+    order_id INT PRIMARY KEY,
+    supplier_id INT NOT NULL,
+    order_date DATE NOT NULL,
+    CONSTRAINT fk_suppliers FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE order_items (
+    order_item_id INT PRIMARY KEY,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price NUMERIC(10, 2) NOT NULL,
+    CONSTRAINT fk_orders FOREIGN KEY (order_id) REFERENCES purchase_orders (order_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE maintenance_logs (
+    log_id INT PRIMARY KEY,
+    equipment_id INT NOT NULL,
+    maintenance_date DATE NOT NULL,
+    description VARCHAR(100)
+);
+
+
+CREATE TABLE equipment (
+    equipment_id INT PRIMARY KEY,
+    equipment_name VARCHAR(100) NOT NULL
+);
+
+
+CREATE TABLE advertising_expenses (
+    expense_id INT PRIMARY KEY,
+    expense_date DATE NOT NULL,
+    description VARCHAR(100),
+    amount NUMERIC(5, 2) NOT NULL
+);
+
+
+
+
+CREATE TABLE business_licenses (
+    license_id INT PRIMARY KEY,
+    license_number VARCHAR(25) NOT NULL,
+    issue_date DATE NOT NULL,
+    expiration_date DATE NOT NULL
+);
+
+
+CREATE TABLE compliance_documents (
+    document_id INT PRIMARY KEY,
+    document_name VARCHAR(25) NOT NULL,
+    description VARCHAR(100),
+    upload_date DATE NOT NULL
+);
+
+
+-- Customer Feedback and Complaints
+CREATE TABLE feedback (
+    feedback_id INT PRIMARY KEY,
+    customer_id INT,
+    feedback_date DATE NOT NULL,
+    feedback_text VARCHAR(100),
+    CONSTRAINT fk_customers_feedback FOREIGN KEY (customer_id) REFERENCES customers (customer_id) ON DELETE CASCADE
+);
+
+
+INSERT INTO sales (sale_id, sale_date, total_amount) VALUES
+(1, '2024-03-28', 1500.00),
+(2, '2024-03-29', 2200.50),
+(3, '2024-03-30', 1800.75);
+
+
+INSERT INTO sale_items (sale_item_id, sale_id, product_id, quantity, price) VALUES
+(1, 1, 101, 2, 500.00),
+(2, 1, 102, 1, 300.00),
+(3, 2, 103, 3, 400.50),
+(4, 3, 104, 2, 450.25);
+
+
+INSERT INTO products (product_id, product_name, price, quantity_in_stock, reorder_point) VALUES
+(101, 'Soccer Ball', 25.00, 50, 10),
+(102, 'Basketball', 30.00, 40, 15),
+(103, 'Tennis Racket', 80.00, 30, 8),
+(104, 'Golf Clubs', 200.00, 20, 5)
+(105, 'Baseball Bat', 375.89, 55, 15),
+(106, 'Squash Ball', 12.15, 40, 15),
+(107, 'Squash Racket', 67.43, 30, 8),
+(108, 'Hockey Stick', 229.99, 25, 5);
+
+
+INSERT INTO financial_records (record_id, record_date, description, amount) VALUES
+(1, '2024-03-28', 'Income from sales', 1504.97),
+(2, '2024-03-29', 'Income from sales', 2237.50),
+(3, '2024-03-30', 'Income from sales', 1890.75);
+
+
+INSERT INTO employees (employee_id, employee_name, position, hourly_rate) VALUES
+(1, 'Cooper Smith', 'Sales Associate', 15.50),
+(2, 'Max Pavlik', 'Store Manager', 21.75),
+(3, 'Henry Fleckner', 'Cashier', 12.25);
+
+
+INSERT INTO timecards (timecard_id, employee_id, work_date, hours_worked) VALUES
+(1, 1, '2024-03-28', 8.0),
+(2, 2, '2024-03-28', 8.0),
+(3, 3, '2024-03-28', 6.5);
+
+
+INSERT INTO customers (customer_id, customer_name, email, phone) VALUES
+(1, 'Rob Gray', 'rgray@gmail.com', '123-456-7890'),
+(2, 'Silas Reed', 'SReed35@hotmail.com', '987-654-3210'),
+(3, 'Gavin Brown', 'BrownieBaseball@yahoo.com', '774-768-5664');
+
+
+INSERT INTO transactions (transaction_id, customer_id, transaction_date, total_amount) VALUES
+(1, 1, '2024-03-28', 75.50),
+(2, 2, '2024-03-29', 150.25);
+
+
+INSERT INTO suppliers (supplier_id, supplier_name, contact_name, phone, email) VALUES
+(1, 'Sports Equipment Supplier', 'Will Napper', '555-123-4567', 'info@sportsupplier.com'),
+(2, 'Fitness Gear Inc.', 'Ahmed Wise', '508-987-6543', 'sales@fitnessgear.com');
+
+
+INSERT INTO purchase_orders (order_id, supplier_id, order_date) VALUES
+(1, 1, '2024-03-28'),
+(2, 2, '2024-03-29');
+
+
+INSERT INTO order_items (order_item_id, order_id, product_id, quantity, price) VALUES
+(1, 1, 101, 100, 20.00),
+(2, 2, 103, 50, 75.00);
+
+
+INSERT INTO maintenance_logs (log_id, equipment_id, maintenance_date, description) VALUES
+(1, 1, '2024-03-28', 'Performed routine maintenance on treadmill'),
+(2, 2, '2024-03-29', 'Replaced batteries in security cameras');
+
+
+INSERT INTO equipment (equipment_id, equipment_name) VALUES
+(1, 'Treadmill'),
+(2, 'Security Cameras'),
+(3, 'Golf Simulator');
+
+
+INSERT INTO advertising_expenses (expense_id, expense_date, description, amount) VALUES
+(1, '2024-03-28', 'Social media ad campaign', 500.00),
+(2, '2024-03-29', 'Printed flyers distribution', 200.00);
+
+
+INSERT INTO business_licenses (license_id, license_number, issue_date, expiration_date) VALUES
+(1, '123456', '2024-01-01', '2025-01-01'),
+(2, '789012', '2023-06-15', '2024-06-15');
+
+
+INSERT INTO compliance_documents (document_id, document_name, description, upload_date) VALUES
+(1, 'Fire Safety Inspection Report', 'Annual fire safety inspection report', '2024-01-15'),
+(2, 'Health Department Permit', 'Permit for food handling and safety', '2024-02-01');
