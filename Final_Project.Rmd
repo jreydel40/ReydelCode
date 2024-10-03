@@ -1,0 +1,544 @@
+---
+title: "Final_Project"
+output:
+  html_document:
+    df_print: paged
+date: "2023-11-06"
+---
+
+```{r setup, include = FALSE}
+# set code chunk option defaults
+knitr::opts_chunk$set(
+  # display code as types
+  tidy = FALSE, 
+  # slightly smaller code font
+  size = "small",
+  # set default figure width and height
+  fig.width = 5, fig.height = 3) 
+
+# improve digit and NA display 
+options(scipen = 1, knitr.kable.NA = '')
+
+# load packages
+library(tidyverse)
+library(kableExtra)
+library(mdsr)
+library(nasaweather)
+library(Stat2Data)
+library(ggplot2)
+library(stats)
+library(ISLR2)
+library(tree)
+library(randomForest)
+library(gbm)
+library(dplyr)
+```
+
+
+
+```{r}
+Updated_Mean_Sale_Data <- read_csv("~/Desktop/Data-200/Metro_mlp_uc_sfrcondo_sm_month.csv")
+Updated_Median_Sale_Data <- read_csv("~/Desktop/Data-200/Metro_median_sale_price_uc_sfrcondo_sm_sa_month.csv")
+Updated_Days_on_Zillow <- read_csv("~/Desktop/Data-200/Metro_mean_doz_pending_uc_sfrcondo_sm_month.csv")
+```
+
+
+
+```{r}
+January_2019_Prices <- Updated_Mean_Sale_Data %>%
+  dplyr::select(RegionID, RegionName, `2019-01-31`)
+
+January_2019_Days_on_Zillow <- Updated_Days_on_Zillow %>%
+  dplyr::select(RegionID, RegionName, `2019-01-31`)
+
+January_Merge <- merge(January_2019_Prices, January_2019_Days_on_Zillow,
+                     by = c("RegionID", "RegionName"))
+
+January_Merge_Clean <- na.omit(January_Merge)
+
+January_Merge_Isolate <- January_Merge_Clean %>%
+  dplyr::select('2019-01-31.x', '2019-01-31.y')
+
+ggplot(data = January_Merge_Clean, aes(x = `2019-01-31.x`, y = `2019-01-31.y`)) +
+  geom_point() +
+  labs(title = "January 2019 Zillow Snapshot",
+       x = "Mean Price",
+       y = "Avg Days on Zillow") 
+```
+
+
+```{r}
+October_2023_Prices <- Updated_Mean_Sale_Data %>%
+  dplyr::select(RegionID, RegionName, StateName, `2023-10-31`)
+
+October_2023_Days_on_Zillow <- Updated_Days_on_Zillow %>%
+  dplyr::select(RegionID, RegionName, StateName, `2023-10-31`)
+
+October_2023_Merge <- merge(October_2023_Prices, October_2023_Days_on_Zillow,
+                     by = c("RegionID", "RegionName", "StateName"))
+
+October_2023_Merge_Clean <- na.omit(October_2023_Merge)
+
+
+October_2023_Merge_Isolate <- October_2023_Merge_Clean %>%
+  dplyr::select(`2023-10-31.x`, `2023-10-31.y`)
+
+ggplot(data = October_2023_Merge_Clean, aes(x = `2023-10-31.x`, y = `2023-10-31.y`)) +
+  geom_point() +
+  labs(title = "October 2023 Zillow Snapshot",
+       x = "Mean Price",
+       y = "Avg Days on Zillow") 
+```
+
+```{r}
+library(stats)
+wcss <- numeric(length = 10) # Assuming a maximum of 10 clusters
+for (i in 1:10) {
+  model <- kmeans(January_Merge_Isolate, centers = i)
+  wcss[i] <- model$tot.withinss
+}
+plot(1:10, wcss, type = "b", xlab = "Number of clusters", ylab = "Within-cluster sum of squares")
+
+
+
+# Scale the data
+scaled_January_Merge_Isolate <- scale(January_Merge_Isolate)
+
+# Perform k-means clustering on the scaled data
+k <- 4
+set.seed(123) 
+January_2019_model <- kmeans(scaled_January_Merge_Isolate, centers = k)
+
+# Plot the clustered data
+plot(
+  January_Merge_Isolate,
+  col = January_2019_model$cluster,
+  ylab = "Days on Zillow",
+  xlab = "Price",
+  main = "January 2019"
+)
+points(January_2019_model$centers, col = 1:k, pch = 8, cex = 2)
+abline(h = 60, col = "orange")
+```
+
+```{r}
+library(stats)
+wcss <- numeric(length = 10) # Assuming a maximum of 10 clusters
+for (i in 1:10) {
+  model <- kmeans(October_2023_Merge_Isolate, centers = i)
+  wcss[i] <- model$tot.withinss
+}
+plot(1:10, wcss, type = "b", xlab = "Number of clusters", ylab = "Within-cluster sum of squares")
+
+
+
+k <- 4
+set.seed(123) 
+
+October_2023_Merge_Isolate_scaled <- scale(October_2023_Merge_Isolate)
+October_2023_model <- kmeans(October_2023_Merge_Isolate_scaled, centers = k)
+
+plot(October_2023_Merge_Isolate, 
+  col = October_2023_model$cluster, 
+  ylab = "Days on Zillow",
+  xlab = "Price",
+  main = "October 2023")
+points(October_2023_model$centers, col = 1:k, pch = 8, cex = 2)
+abline(h = 60, col = "orange")
+```
+
+
+```{r}
+January_2021_Prices <- Updated_Mean_Sale_Data %>%
+  dplyr::select(RegionID, RegionName, `2021-01-31`)
+
+January_2021_Days_on_Zillow <- Updated_Days_on_Zillow %>%
+  dplyr::select(RegionID, RegionName, `2021-01-31`)
+
+January21_Merge <- merge(January_2021_Prices, January_2021_Days_on_Zillow,
+                     by = c("RegionID", "RegionName"))
+
+January21_Merge_Clean <- na.omit(January21_Merge)
+
+January21_Merge_Isolate <- January21_Merge_Clean %>%
+  dplyr::select('2021-01-31.x', '2021-01-31.y')
+
+ggplot(data = January21_Merge_Clean, aes(x = `2021-01-31.x`, y = `2021-01-31.y`)) +
+  geom_point() +
+  labs(title = "January 2021 Zillow Snapshot",
+       x = "Mean Price",
+       y = "Avg Days on Zillow") 
+```
+```{r}
+wcss <- numeric(length = 10) # Assuming a maximum of 10 clusters
+for (i in 1:10) {
+  model <- kmeans(January21_Merge_Isolate, centers = i)
+  wcss[i] <- model$tot.withinss
+}
+plot(1:10, wcss, type = "b", xlab = "Number of clusters", ylab = "Within-cluster sum of squares")
+
+
+
+k <- 4
+set.seed(123) 
+
+January21_Merge_Isolate_scaled <- scale(January21_Merge_Isolate)
+January_2021_model <- kmeans(January21_Merge_Isolate_scaled, centers = k)
+
+plot(January21_Merge_Isolate,
+  col = January_2021_model$cluster,
+  ylab = "Days on Zillow",
+  xlab = "Price",
+  main = "January 2021")
+points(January_2021_model$centers, col = 1:k, pch = 8, cex = 2)
+abline(h = 60, col = "orange")
+```
+```{r}
+cluster_assignments_2021 <- January_2021_model$cluster
+
+January_2021_w_cluster <- cbind(January21_Merge_Clean, Cluster = cluster_assignments_2021)
+```
+
+```{r}
+cluster_assignments_2019 <- January_2019_model$cluster
+
+January_2019_w_cluster <- cbind(January_Merge_Clean, Cluster = cluster_assignments_2019)
+```
+
+
+```{r}
+cluster_assignments_2023 <- October_2023_model$cluster
+
+October_2023_w_cluster <- cbind(October_2023_Merge_Clean, Cluster = cluster_assignments_2023)
+```
+
+
+
+```{r}
+Linear_model_2019 <- lm(`2019-01-31.y` ~ `2019-01-31.x` , data = January_Merge_Clean)
+
+summary(Linear_model_2019)
+
+plot(`2019-01-31.y` ~ `2019-01-31.x`, data = January_Merge_Clean, main = "January 2019", 
+     ylab = "Days on Zillow", xlab = "Price")
+abline(Linear_model_2019, col = "red")
+```
+```{r}
+Linear_model_2021 <- lm(`2021-01-31.y` ~ `2021-01-31.x`, data = January21_Merge_Clean)
+
+summary(Linear_model_2021)
+
+plot(`2021-01-31.y` ~ `2021-01-31.x`, data = January21_Merge_Clean, main = "January 2021", 
+     ylab = "Days on Zillow", xlab = "Price")
+abline(Linear_model_2021, col = "red")
+```
+
+```{r}
+Linear_model_2023 <- lm(`2023-10-31.y` ~ `2023-10-31.x`, data = October_2023_Merge_Clean)
+
+summary(Linear_model_2023)
+
+plot(`2023-10-31.y` ~ `2023-10-31.x`, data = October_2023_Merge_Clean, main = "October 2023", 
+     ylab = "Days on Zillow", xlab = "Price")
+abline(Linear_model_2023, col = "red")
+```
+
+
+```{r}
+Sold_Above_List <- read_csv("~/Desktop/Data-200/Metro_pct_sold_above_list_uc_sfrcondo_sm_month.csv")
+
+January_2019_PSA <- Sold_Above_List %>%
+  dplyr::select(RegionID, RegionName, `2019-01-31`)
+
+January_2019_PSA_Merge<- merge(January_Merge, January_2019_PSA,
+                     by = c("RegionID", "RegionName"))
+
+num_cols <- ncol(January_2019_PSA_Merge)
+
+all_col_names <- colnames(January_2019_PSA_Merge)
+
+new_names <- c("Price", "Days_On_Zillow", "PSA")
+
+colnames(January_2019_PSA_Merge)[(num_cols - 2):num_cols] <- new_names
+
+January_2019_PSA_Merge_Clean <- na.omit(January_2019_PSA_Merge)
+```
+
+```{r}
+January2019_3D_Data <- January_2019_PSA_Merge_Clean %>%
+  dplyr::select(Price, Days_On_Zillow, PSA)
+
+wcss <- numeric(length = 10) 
+for (i in 1:10) {
+  model <- kmeans(January2019_3D_Data, centers = i)
+  wcss[i] <- model$tot.withinss
+}
+plot(1:10, wcss, type = "b", xlab = "Number of clusters", ylab = "Within-cluster sum of squares")
+
+k <- 4
+set.seed(123) 
+
+January2019_3D_Data <- January2019_3D_Data[, sapply(January2019_3D_Data, is.numeric)]
+
+# Scale the numeric columns
+January2019_3D_Data <- scale(January2019_3D_Data)
+
+January2019_3D_Data <- kmeans(January2019_3D_Data, centers = k)
+
+Cluster_Assign_3d1 <- January2019_3D_Data$cluster
+
+data_with_clusters_2019_3D <- cbind(January_2019_PSA_Merge_Clean, Cluster = Cluster_Assign_3d1)
+
+library(plotly)
+
+data_with_clusters_2019_3D <- as.data.frame(data_with_clusters_2019_3D)
+
+plot_3d2019 <- plot_ly(data_with_clusters_2019_3D, 
+                   x = ~Price, 
+                   y = ~Days_On_Zillow, 
+                   z = ~PSA, 
+                   color = ~Cluster, 
+                   type = "scatter3d", 
+                   mode = "markers",
+                   marker = list(size = 5))
+
+
+plot_3d2019 <- plot_3d2019 %>% layout(
+  scene = list(
+    xaxis = list(title = "Price"),
+    yaxis = list(title = "Days_On_Zillow"),
+    zaxis = list(title = "PSA")
+  )
+)
+
+# Show the plot
+plot_3d2019
+```
+```{r}
+January_2021_PSA <- Sold_Above_List %>%
+  dplyr::select(RegionID, RegionName, `2021-01-31`)
+
+January_2021_PSA_Merge<- merge(January21_Merge, January_2021_PSA,
+                     by = c("RegionID", "RegionName"))
+
+num_cols <- ncol(January_2021_PSA_Merge)
+
+all_col_names <- colnames(January_2021_PSA_Merge)
+
+new_names <- c("Price", "Days_On_Zillow", "PSA")
+
+colnames(January_2021_PSA_Merge)[(num_cols - 2):num_cols] <- new_names
+
+January_2021_PSA_Merge_Clean <- na.omit(January_2021_PSA_Merge)
+```
+
+
+
+
+```{r}
+January2021_3D_Data <- January_2021_PSA_Merge_Clean %>%
+  dplyr::select(Price, Days_On_Zillow, PSA)
+
+wcss <- numeric(length = 10) 
+for (i in 1:10) {
+  model <- kmeans(January2021_3D_Data, centers = i)
+  wcss[i] <- model$tot.withinss
+}
+plot(1:10, wcss, type = "b", xlab = "Number of clusters", ylab = "Within-cluster sum of squares")
+
+k <- 4
+set.seed(123) 
+
+January2021_3D_Data <- January2021_3D_Data[, sapply(January2021_3D_Data, is.numeric)]
+
+# Scale the numeric columns
+January2021_3D_Data <- scale(January2021_3D_Data)
+
+January2021_3D_Data <- kmeans(January2021_3D_Data, centers = k)
+
+Cluster_Assign_3d1 <- January2021_3D_Data$cluster
+
+data_with_clusters_2021_3D <- cbind(January_2021_PSA_Merge_Clean, Cluster = Cluster_Assign_3d1)
+
+library(plotly)
+
+data_with_clusters_2021_3D <- as.data.frame(data_with_clusters_2021_3D)
+
+plot_3d2021 <- plot_ly(data_with_clusters_2021_3D, 
+                   x = ~Price, 
+                   y = ~Days_On_Zillow, 
+                   z = ~PSA, 
+                   color = ~Cluster, 
+                   type = "scatter3d", 
+                   mode = "markers",
+                   marker = list(size = 5))
+
+
+plot_3d2021 <- plot_3d2021 %>% layout(
+  scene = list(
+    xaxis = list(title = "Price"),
+    yaxis = list(title = "Days_On_Zillow"),
+    zaxis = list(title = "PSA")
+  )
+)
+
+# Show the plot
+plot_3d2021
+```
+
+
+```{r}
+Sold_Above_List_October <- read_csv("~/Desktop/Data-200/Metro_pct_sold_above_list_uc_sfrcondo_sm_week.csv")
+
+October_2023_PSA <- Sold_Above_List_October %>%
+  dplyr::select(RegionID, RegionName, `2023-10-07`)
+
+October_2023_PSA_Merge<- merge(October_2023_Merge, October_2023_PSA,
+                     by = c("RegionID", "RegionName"))
+
+num_cols <- ncol(October_2023_PSA_Merge)
+
+all_col_names <- colnames(October_2023_PSA_Merge)
+
+new_names <- c("Price", "Days_On_Zillow", "PSA")
+
+colnames(October_2023_PSA_Merge)[(num_cols - 2):num_cols] <- new_names
+
+October_2023_PSA_Merge_Clean <- na.omit(October_2023_PSA_Merge)
+```
+
+
+
+
+```{r}
+October2023_3D_Data <- October_2023_PSA_Merge_Clean %>%
+  dplyr::select(Price, Days_On_Zillow, PSA)
+
+wcss <- numeric(length = 10) 
+for (i in 1:10) {
+  model <- kmeans(October2023_3D_Data, centers = i)
+  wcss[i] <- model$tot.withinss
+}
+plot(1:10, wcss, type = "b", xlab = "Number of clusters", ylab = "Within-cluster sum of squares")
+
+k <- 4
+set.seed(123) 
+
+October2023_3D_Data <- October2023_3D_Data[, sapply(October2023_3D_Data, is.numeric)]
+
+# Scale the numeric columns
+October2023_3D_Data <- scale(October2023_3D_Data)
+
+October2023_3D_Data <- kmeans(October2023_3D_Data, centers = k)
+
+Cluster_Assign_3d1 <- October2023_3D_Data$cluster
+
+data_with_clusters_2023_3D <- cbind(October_2023_PSA_Merge_Clean, Cluster = Cluster_Assign_3d1)
+
+library(plotly)
+
+data_with_clusters_2023_3D <- as.data.frame(data_with_clusters_2023_3D)
+
+plot_3d2023 <- plot_ly(data_with_clusters_2023_3D, 
+                   x = ~Price, 
+                   y = ~Days_On_Zillow, 
+                   z = ~PSA, 
+                   color = ~Cluster, 
+                   type = "scatter3d", 
+                   mode = "markers",
+                   marker = list(size = 5))
+
+plot_3d2023 <- plot_3d2023 %>% layout(
+  scene = list(
+    xaxis = list(title = "Price"),
+    yaxis = list(title = "Days_On_Zillow"),
+    zaxis = list(title = "PSA")
+  )
+)
+
+
+
+# Show the plot
+plot_3d2023
+```
+
+```{r}
+mean(data_with_clusters_2019_3D$Price, na.rm = TRUE)
+mean(data_with_clusters_2019_3D$PSA, na.rm = TRUE)
+
+hotspots_2019 <- data_with_clusters_2019_3D %>%
+  dplyr::filter(Days_On_Zillow <= 60)
+
+hotspots_2019 <- hotspots_2019 %>%
+  mutate(Is_Hotspot = 1)
+
+Not_hotspots_2019 <- data_with_clusters_2019_3D %>%
+  dplyr::filter(Days_On_Zillow >= 60)
+
+Not_hotspots_2019 <- Not_hotspots_2019 %>%
+  mutate(Is_Hotspot = 0)
+
+hotspot_2019_Merge <- rbind(hotspots_2019, Not_hotspots_2019)
+```
+
+
+```{r}
+mean(data_with_clusters_2021_3D$Price, na.rm = TRUE)
+mean(data_with_clusters_2021_3D$PSA, na.rm = TRUE)
+
+hotspots_2021 <- data_with_clusters_2021_3D %>%
+  dplyr::filter(Days_On_Zillow <= 60)
+
+hotspots_2021 <- hotspots_2021 %>%
+  mutate(Is_Hotspot = 1)
+
+Not_hotspots_2021 <- data_with_clusters_2021_3D %>%
+  dplyr::filter(Days_On_Zillow >= 60)
+
+Not_hotspots_2021 <- Not_hotspots_2021 %>%
+  mutate(Is_Hotspot = 0)
+
+hotspot_2021_Merge <- rbind(hotspots_2021, Not_hotspots_2021)
+```
+
+
+```{r}
+mean(data_with_clusters_2023_3D$Price, na.rm = TRUE)
+mean(data_with_clusters_2023_3D$PSA, na.rm = TRUE)
+
+
+hotspots_2023 <- data_with_clusters_2023_3D %>%
+  dplyr::filter(Days_On_Zillow <= 60)
+
+hotspots_2023 <- hotspots_2023 %>%
+  mutate(Is_Hotspot = 1)
+
+Not_hotspots_2023 <- data_with_clusters_2023_3D %>%
+  dplyr::filter(Days_On_Zillow >= 60)
+
+Not_hotspots_2023 <- Not_hotspots_2023 %>%
+  mutate(Is_Hotspot = 0)
+
+hotspot_2023_Merge <- rbind(hotspots_2023, Not_hotspots_2023)
+```
+
+```{r}
+logistic_model_2019 <- glm(Is_Hotspot ~ Price + PSA, data = hotspot_2019_Merge, family = binomial)
+
+summary(logistic_model_2019)
+```
+
+```{r}
+logistic_model_2021 <- glm(Is_Hotspot ~ Price + PSA, data = hotspot_2021_Merge, family = binomial)
+
+summary(logistic_model_2021)
+```
+
+```{r}
+logistic_model_2023 <- glm(Is_Hotspot ~ Price + PSA, data = hotspot_2023_Merge, family = binomial)
+
+summary(logistic_model_2023)
+```
+
+
+
