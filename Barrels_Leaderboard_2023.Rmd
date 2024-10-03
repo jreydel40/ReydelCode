@@ -1,0 +1,115 @@
+---
+title: "Barrels_Leaderboard_2023"
+output: html_document
+date: "2023-06-09"
+---
+```{r setup, include=FALSE}
+# set code chunk option defaults
+knitr::opts_chunk$set(
+  # display code as types
+  tidy = FALSE, 
+  # slightly smaller code font
+  size = "small",
+  # set default figure width and height
+  fig.width = 5, fig.height = 3) 
+
+# improve digit and NA display 
+options(scipen = 1, knitr.kable.NA = '')
+```
+
+```{r include = FALSE, echo = FALSE}
+
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(pitchRx)
+library(Lahman)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(flextable)
+library(xgboost)
+
+
+load("~/Desktop/Neers_To_Send/Batters/xBAD1.rda")
+
+x <- read.csv("~/Desktop/Mountaineers/Mountaineers/2023Complete.CSV", header = TRUE)
+
+x <- x%>%
+  filter(BatterTeam == "VER_MOU")
+  
+
+batters <- unique(x$Batter)
+
+
+
+x <- x%>%
+   mutate(PlayResult = ifelse(KorBB == 'Walk', 'Walk', 
+                             ifelse(KorBB == 'Strikeout', 'Strikeout', x$PlayResult)))%>%
+  mutate(Hit = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun', 1, 0))
+
+x_2 <- xgb.DMatrix(data = as.matrix(x[c(47:49, 56)]), label = x$Hit)
+
+x <- x%>%
+  mutate(AB = ifelse(PlayResult == 'Undefined' | PlayResult == 'Walk' | PlayResult == 'Error' | PlayResult == 'Sacrifice', 0, 1))%>%
+  mutate(PA = ifelse(PlayResult == 'Undefined', 0, 1))%>%
+  mutate(Chase = ifelse(PitchCall == "BallCalled" | PitchCall == "HitByPitch" | PitchCall == "BallinDirt", 0, 
+                        ifelse(PlateLocSide > 1.13 | PlateLocSide < -1.13 | PlateLocHeight < 1.16 | PlateLocHeight > 3.84, 
+                               ifelse(PitchCall != "StrikeCalled", 1,0), 
+                               0)))%>%
+  mutate(Barrel = ifelse(ExitSpeed > 88 & Angle > 5 & Angle < 30, 1, 0))%>%
+  mutate(PitchType = ifelse(TaggedPitchType == 'Four-Seam' | TaggedPitchType == "Sinker", 'Fastball', 'Offspeed'))%>%
+  mutate(OB = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun' | PlayResult == 'Walk', 1, 0))%>%
+  mutate(TB = ifelse(PlayResult == 'Single', 1, 
+                     ifelse(PlayResult == 'Double', 2, 
+                            ifelse(PlayResult == 'Triple', 3, 
+                                   ifelse(PlayResult == 'HomeRun', 4, 0)))))%>%
+  mutate(K = ifelse(PlayResult == 'Strikeout', 1, 0))%>%
+  mutate(Swing = ifelse(PitchCall == 'StrikeSwinging' | PitchCall == 'FoulBall' | PitchCall == 'InPlay', 1, 0))%>%
+  mutate(InPlay = ifelse(PitchCall == 'InPlay', 1, 0))%>%
+  mutate(xBABIP = ifelse(PitchCall == 'InPlay', predict(fit_2, x_2, type = "response"), NA))%>%
+  mutate(SwingMiss = ifelse(Swing == 1 & InPlay == 1, 0, 
+                            ifelse(PitchCall == 'FoulBall', 0, 1)))
+
+
+```
+
+```{r echo = FALSE}
+
+## Boxscore stats
+
+boxscore <- x[, c(10, 168:172, 174:176)]
+
+boxscore[is.na(boxscore)]= 0
+
+boxscore <- aggregate(list(boxscore$Hit, boxscore$AB, boxscore$PA, boxscore$OB, boxscore$TB, boxscore$K, boxscore$Chase, boxscore$Barrel), by = list(boxscore$Batter), FUN = sum)
+
+colnames(boxscore) = c('Batter', 'Hits', 'AB', 'PA', 'OB', 'TB', 'K', 'Chases', 'Barrels')
+
+
+boxscore <- boxscore%>%
+  mutate(Avg = round(Hits/AB, 3))%>%
+  mutate(OBP = round(OB/PA, 3))%>%
+  mutate(SLG = round(TB/AB, 3))%>%
+  mutate(OPS = SLG + OBP)%>%
+  mutate('K%' = round(K/AB, 3))
+
+boxscore <- boxscore%>%
+  mutate(Chases_Per_PA = round(Chases/PA,2))%>%
+  mutate(Barrels_Per_AB = round(Barrels/AB,2))
+
+boxscore <- boxscore%>%
+  filter(Batter != "Cameron")
+
+boxscore <- boxscore[, c(1, 16)]
+
+regulartable(boxscore[order(-boxscore$Barrels_Per_AB),])%>%
+  autofit()
+
+```

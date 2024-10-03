@@ -1,0 +1,101 @@
+---
+title: "Pitcher_Scout_2023"
+output: html_document
+date: "2023-06-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, include=FALSE}
+
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(pitchRx)
+library(Lahman)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(flextable)
+library(xgboost)
+library(formattable)
+
+
+load("~/Desktop/Neers_To_Send/Batters/xBAD1.rda")
+
+x <- read.csv("~/Desktop/Mountaineers/Mountaineers/2023Complete.CSV", header = TRUE)
+
+x <- x%>%
+  filter(PitcherTeam == "VER_MOU")
+
+
+
+x <- x%>%
+   mutate(PlayResult = ifelse(KorBB == 'Walk', 'Walk', 
+                             ifelse(KorBB == 'Strikeout', 'Strikeout', x$PlayResult)))%>%
+  mutate(Hit = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun', 1, 0))
+
+x_2 <- xgb.DMatrix(data = as.matrix(x[c(47:49, 56)]), label = x$Hit)
+
+x <- x%>%
+  mutate(AB = ifelse(PlayResult == 'Undefined' | PlayResult == 'Walk' | PlayResult == 'Error' | PlayResult == 'Sacrifice', 0, 1))%>%
+  mutate(PA = ifelse(PlayResult == 'Undefined', 0, 1))%>%
+  mutate(Chase = ifelse(PitchCall == "BallCalled" | PitchCall == "HitByPitch" | PitchCall == "BallinDirt", 0, 
+                        ifelse(PlateLocSide > 1.13 | PlateLocSide < -1.13 | PlateLocHeight < 1.16 | PlateLocHeight > 3.84, 
+                               ifelse(PitchCall != "StrikeCalled", 1,0), 
+                               0)))%>%
+  mutate(Barrel = ifelse(ExitSpeed > 88 & Angle > 5 & Angle < 30, 1, 0))%>%
+  mutate(PitchType = ifelse(TaggedPitchType == 'Four-Seam' | TaggedPitchType == "Sinker", 'Fastball', 'Offspeed'))%>%
+  mutate(OB = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun' | PlayResult == 'Walk', 1, 0))%>%
+  mutate(TB = ifelse(PlayResult == 'Single', 1, 
+                     ifelse(PlayResult == 'Double', 2, 
+                            ifelse(PlayResult == 'Triple', 3, 
+                                   ifelse(PlayResult == 'HomeRun', 4, 0)))))%>%
+  mutate(K = ifelse(PlayResult == 'Strikeout', 1, 0))%>%
+  mutate(Swing = ifelse(PitchCall == 'StrikeSwinging' | PitchCall == 'FoulBall' | PitchCall == 'InPlay', 1, 0))%>%
+  mutate(InPlay = ifelse(PitchCall == 'InPlay', 1, 0))%>%
+  mutate(xBABIP = ifelse(PitchCall == 'InPlay', predict(fit_2, x_2, type = "response"), NA))%>%
+  mutate(SwingMiss = ifelse(Swing == 1 & InPlay == 1, 0, 
+                            ifelse(PitchCall == 'FoulBall', 0, 1)))%>%
+  mutate(PlayResult = ifelse(OutsOnPlay == 2, "DP", x$PlayResult))
+
+
+x <- x%>%
+  mutate(Innings = ifelse(PlayResult == "DP", 2/3, ifelse(
+    PlayResult == "Strikeout" | PlayResult == "Out" | PlayResult == "Sacrifice" | PlayResult == "FieldersChoice", 1/3, 0
+  )))%>%
+  mutate(Count = 1)%>%
+  mutate(Walk = ifelse(KorBB == "Walk", 1, 0))%>%
+  mutate(Strike = ifelse(PitchCall == "BallCalled" | PitchCall == "HitByPitch" | PitchCall == "BallinDirt", 0, 1))
+
+
+```
+
+```{r echo=FALSE}
+
+
+t1 <- aggregate(list(x$Count, x$Innings, x$K, x$Walk, x$RunsScored, x$Strike, x$Chase), by = list(x$Pitcher), FUN = sum)
+
+colnames(t1) <- c("Pitcher", "Pitches", "Innings", "Strikeouts", "Walks", "Runs", "Strikes", "Chases")
+
+t1 <- t1%>%
+  mutate(Innings = round(Innings,2))%>%
+  mutate(ERA = round((Runs/Innings)*9,2))%>%
+  mutate(StrikePerc = percent(Strikes/Pitches,2))%>%
+  mutate(ChasePerc = percent(Chases/Pitches,2))%>%
+  mutate(School = "           ")%>%
+  mutate(Notes = "                           ")
+
+
+regulartable(t1[c(1,12,2,3,9,4,5,10,11,13)])%>%
+  autofit()
+
+```

@@ -1,0 +1,363 @@
+---
+title: "Pregent Framing"
+date: 'Updated Through 8/6/22'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load in functions
+
+```{r echo=FALSE, include=FALSE}
+grid_predict <- function(fit){
+  grid <- expand.grid(PlateLocSide = seq(-1.75, 1.75, length=50),
+                      PlateLocHeight = seq(0, 5, length=50))
+  grid$lp <- predict(fit, grid, type = "response")
+  grid
+}
+
+add_zone <- function(Color = "black"){
+  topKzone <- 3.5
+  botKzone <- 1.6
+  inKzone <- -0.85
+  outKzone <- 0.85
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+            lwd=1, col=Color)
+}
+
+add_heart <- function(Color = "Red"){
+  topKzone <- 3.26
+  botKzone <- 1.84
+  inKzone <- -0.55
+  outKzone <- 0.55
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+            lwd=1, col=Color)
+}
+
+add_shadow <- function(Color = "Grey"){
+  topKzone <- 3.84
+  botKzone <- 1.16
+  inKzone <- -1.13
+  outKzone <- 1.13
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+            lwd=1, col=Color)
+}
+
+contour_graph <- function(df, L, title){
+  
+  ggplot(df)  +
+    geom_contour_fill(aes(x=PlateLocSide,
+                          y=PlateLocHeight,
+                          z=lp),
+                      breaks=c(L),
+                      size=1.5) +
+    scale_fill_distiller(palette="Spectral") +
+    add_zone("black") +
+    xlim(-2, 2) +
+    ylim(0.0, 4.0)  +
+    coord_fixed() +
+    ggtitle(title)
+    #centertitle() +
+    #increasefont()
+}
+```
+
+Load in data/packages
+
+```{r echo = FALSE, include=FALSE}
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(pitchRx)
+library(Lahman)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+
+retz <- read.csv('C:/Users/messi/OneDrive/Desktop/Mountaineers_2022/Games/2022Complete.CSV', header = TRUE)
+
+d1 <- read.csv("C:/Users/messi/OneDrive/Desktop/Mountaineers_2022/Catchers/Retzbach/d1_22.csv", header = TRUE)
+
+
+retz <- retz%>%
+  filter(Catcher == "Pregent, Christian")
+
+##Clean data for analysis
+
+retz <- retz%>%
+  filter(PitchCall != 'StrikeSwinging' & PitchCall != 'FoulBall' & PitchCall != 'InPlay')%>%
+  mutate(CalledStrike = ifelse(PitchCall == 'StrikeCalled' , 1, 0))%>%
+    mutate(PitchType = ifelse(TaggedPitchType == 'Four-Seam' | TaggedPitchType == "Sinker" | TaggedPitchType == "Cutter", 'Fastball', 'Offspeed'))
+
+d1<-  d1%>%
+   filter(PitchCall != 'StrikeSwinging' & PitchCall != 'FoulBall' & PitchCall != 'InPlay')%>%
+    mutate(CalledStrike = ifelse(PitchCall == 'StrikeCalled' , 1, 0))%>%
+    mutate(PitchType = ifelse(TaggedPitchType == 'Fastball', 'Fastball', 'Offspeed'))
+
+retz <- retz%>%
+  filter(!(PlateLocHeight == 0 & PlateLocSide == 0))
+
+
+```
+
+Basic Contour and Pitch Plots
+
+```{r echo =FALSE}
+gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=retz)%>%
+  grid_predict()%>%
+  contour_graph(L=seq(0, 1, by=.01), title = 'Pregent Framing')+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+
+gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=retz)%>%
+  grid_predict()%>%
+  contour_graph(L=c(.25, .5, .75), title = 'Pregent Framing')+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+```
+
+
+```{r echo=FALSE}
+
+l <- retz%>%
+  filter(BatterSide == 'Left')
+
+r <- retz%>%
+  filter(BatterSide == "Right")
+
+o <- retz%>%
+  filter(PitchType == "Offspeed")
+
+f <- retz%>%
+  filter(PitchType == "Fastball")
+
+gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=l)%>%
+  grid_predict()%>%
+  contour_graph(L=seq(0, 1, by=.01), title = 'Pregent Framing LHH')+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+
+gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=r)%>%
+  grid_predict()%>%
+  contour_graph(L=seq(0, 1, by=.01), title = 'Pregent Framing RHH')+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+
+gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=o)%>%
+  grid_predict()%>%
+  contour_graph(L=seq(0, 1, by=.01), title = 'Pregent Framing Offspeed')+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+
+gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=f)%>%
+  grid_predict()%>%
+  contour_graph(L=seq(0, 1, by=.01), title = 'Pregent Framing Fastball')+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+
+gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=retz)%>%
+  grid_predict()%>%
+  contour_graph(L=seq(0, 1, by=.01), title = 'Pregent Framing')+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+
+```
+
+Calculate League Zone
+
+```{r echo=FALSE, include=FALSE}
+
+
+league_zone <- gam(CalledStrike ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=d1)%>%
+  grid_predict()
+
+league_zone <- league_zone%>%
+  filter(0.5 < lp | lp == 0.5)
+
+
+```
+
+Mutate data for strike/run analysis
+
+```{r echo=FALSE, include=FALSE}
+retz <- retz%>%
+    mutate(xK = ifelse(min(league_zone$PlateLocHeight) <= round(PlateLocHeight,1) & round(PlateLocHeight,1) <= max(league_zone$PlateLocHeight) & min(league_zone$PlateLocSide) <= round(PlateLocSide,1) & round(PlateLocSide,1) <= max(league_zone$PlateLocSide),1,0))%>%
+  mutate(tK = ifelse(PlateLocSide > 1 | PlateLocSide < -1 | PlateLocHeight < 1.6 | PlateLocHeight > 3.5, 0, 1))%>%
+    mutate(StrikesAddedD1 = ifelse(xK == 0 & CalledStrike == 1, 1,
+                               ifelse(xK == 1 & CalledStrike == 0, -1, 0)))%>%
+  mutate(StrikesAdded = ifelse(tK == 0 & CalledStrike == 1, 1,
+                               ifelse(tK == 1 & CalledStrike == 0, -1, 0)))%>%
+  mutate(Count = ifelse(Balls == 0 & Strikes == 0, '0-0', ifelse(
+    Balls == 1 & Strikes == 0, '1-0', ifelse(
+      Balls == 2 & Strikes == 0, '2-0', ifelse(
+        Balls == 3 & Strikes == 0, '3-0', ifelse(
+          Balls == 1 & Strikes == 1, '1-1', ifelse(
+            Balls == 1 & Strikes == 2, '1-2', ifelse(
+              Balls == 2 & Strikes == 1, '2-1', ifelse(
+                Balls == 2 & Strikes == 2, '2-2', ifelse(
+                  Balls == 3 & Strikes == 1, '3-1',ifelse(
+                    Balls == 0 & Strikes == 1, '0-1', ifelse(
+                      Balls == 0 & Strikes == 2, '0-2', '3-2'
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )))%>%
+  mutate(RunValueAdded = ifelse(StrikesAdded == 1 & Count == '0-0', .069, ifelse(
+    StrikesAdded == 1 & Count == '0-1', .058, ifelse(
+      StrikesAdded == 1 & Count == '0-2', .068, ifelse(
+        StrikesAdded == 1 & Count == '1-0', .1, ifelse(
+          StrikesAdded == 1 & Count == '1-1', .092, ifelse(
+            StrikesAdded == 1 & Count == '1-2', .108, ifelse(
+              StrikesAdded == 1 & Count == '2-0', .16, ifelse(
+                StrikesAdded == 1 & Count == '2-1', .156, ifelse(
+                  StrikesAdded == 1 & Count == '2-2', .192, ifelse(
+                    StrikesAdded == 1 & Count == '3-0', .2, ifelse(
+                      StrikesAdded == 1 & Count == '3-1', .284, ifelse(
+                        StrikesAdded == 1 & Count == '3-2', .443, ifelse(
+    StrikesAdded == -1 & Count == '0-1', -.058, ifelse(
+      StrikesAdded == -1 & Count == '0-2', -.068, ifelse(
+        StrikesAdded == -1 & Count == '1-0', -.1, ifelse(
+          StrikesAdded == -1 & Count == '1-1', -.092, ifelse(
+            StrikesAdded == -1 & Count == '1-2', -.108, ifelse(
+              StrikesAdded == -1 & Count == '2-0', -.16, ifelse(
+                StrikesAdded == -1 & Count == '2-1', -.156, ifelse(
+                  StrikesAdded == -1 & Count == '2-2', -.192, ifelse(
+                    StrikesAdded == -1 & Count == '3-0', -.2, ifelse(
+                      StrikesAdded == -1 & Count == '3-1', -.284, ifelse(
+                        StrikesAdded == -1 & Count == '3-2', -.443, ifelse(
+                          StrikesAdded == -1 & Count == '0-0', -.069, 0)))))))))))
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )))))%>%
+    mutate(RunValueAddedD1 = ifelse(StrikesAdded == 1 & Count == '0-0', .069, ifelse(
+    StrikesAddedD1 == 1 & Count == '0-1', .058, ifelse(
+      StrikesAddedD1 == 1 & Count == '0-2', .068, ifelse(
+        StrikesAddedD1 == 1 & Count == '1-0', .1, ifelse(
+          StrikesAddedD1 == 1 & Count == '1-1', .092, ifelse(
+            StrikesAddedD1 == 1 & Count == '1-2', .108, ifelse(
+              StrikesAddedD1 == 1 & Count == '2-0', .16, ifelse(
+                StrikesAddedD1 == 1 & Count == '2-1', .156, ifelse(
+                  StrikesAddedD1 == 1 & Count == '2-2', .192, ifelse(
+                    StrikesAddedD1 == 1 & Count == '3-0', .2, ifelse(
+                      StrikesAddedD1 == 1 & Count == '3-1', .284, ifelse(
+                        StrikesAddedD1 == 1 & Count == '3-2', .443, ifelse(
+    StrikesAddedD1 == -1 & Count == '0-1', -.058, ifelse(
+      StrikesAddedD1 == -1 & Count == '0-2', -.068, ifelse(
+        StrikesAddedD1 == -1 & Count == '1-0', -.1, ifelse(
+          StrikesAddedD1 == -1 & Count == '1-1', -.092, ifelse(
+            StrikesAddedD1 == -1 & Count == '1-2', -.108, ifelse(
+              StrikesAddedD1 == -1 & Count == '2-0', -.16, ifelse(
+                StrikesAddedD1 == -1 & Count == '2-1', -.156, ifelse(
+                  StrikesAddedD1 == -1 & Count == '2-2', -.192, ifelse(
+                    StrikesAddedD1 == -1 & Count == '3-0', -.2, ifelse(
+                      StrikesAddedD1 == -1 & Count == '3-1', -.284, ifelse(
+                        StrikesAddedD1 == -1 & Count == '3-2', -.443, ifelse(
+                          StrikesAddedD1 == -1 & Count == '0-0', -.069, 0)))))))))))
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )))))
+
+
+retz <- retz%>%
+  filter(!is.na(StrikesAdded))
+ 
+ 
+```
+
+Strikes Added and Runs Added Graphs
+
+```{r echo=FALSE}
+
+retz%>%
+  filter(StrikesAdded != 0)%>%
+  ggplot()+
+  geom_point(aes(x=PlateLocSide, y=PlateLocHeight, color = StrikesAdded))  +
+  add_zone() +
+  xlim(-2, 2) +
+  ylim(0.0, 5)  +
+  coord_fixed() +
+  labs(title = 'Pregent Strikes Added (Real Zone)', subtitle = paste('Net', sum(retz$StrikesAdded), 'Strikes Added. Net', sum(retz$RunValueAdded), 'Runs Saved'))
+
+retz%>%
+  filter(StrikesAddedD1 != 0)%>%
+  ggplot()+
+  geom_point(aes(x=PlateLocSide, y=PlateLocHeight, color = StrikesAddedD1))  +
+  add_zone() +
+  xlim(-2, 2) +
+  ylim(0.0, 5)  +
+  coord_fixed() +
+  labs(title = 'Pregent Strikes Added (D1 Zone)', subtitle = paste('Net', sum(retz$StrikesAddedD1), 'Strikes Added. Net', sum(retz$RunValueAddedD1), 'Runs Saved'))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

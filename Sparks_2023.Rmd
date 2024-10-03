@@ -1,0 +1,331 @@
+---
+title: "Sparks_2023"
+output: html_document
+date: "2023-06-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include = FALSE, echo = FALSE}
+
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(xgboost)
+library(flextable)
+library(formattable)
+library(astroFns)
+library(grid)
+library(tibble)
+
+options(tibble.print_max = Inf) # to show all the rows.
+options(tibble.width = Inf)
+
+x <- read.csv("~/Desktop/Mountaineers/Mountaineers/2023Complete.CSV", header = TRUE)
+
+x <- x%>%
+  filter(Pitcher == "Sparks")
+
+pitchers <- unique(x$Pitcher)
+
+
+
+x <- x%>%
+   mutate(PlayResult = ifelse(KorBB == 'Walk', 'Walk', 
+                             ifelse(KorBB == 'Strikeout', 'Strikeout', x$PlayResult)))%>%
+  mutate(Hit = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun', 1, 0))
+
+x_2 <- xgb.DMatrix(data = as.matrix(x[c(47:49, 56)]), label = x$Hit)
+
+x <- x%>%
+  mutate(AB = ifelse(PlayResult == 'Undefined' | PlayResult == 'Walk' | PlayResult == 'Error' | PlayResult == 'Sacrifice', 0, 1))%>%
+  mutate(PA = ifelse(PlayResult == 'Undefined', 0, 1))%>%
+  mutate(Chase = ifelse(PitchCall == "BallCalled" | PitchCall == "HitByPitch", 0, 
+                        ifelse(PlateLocSide > 1.13 | PlateLocSide < -1.13 | PlateLocHeight < 1.16 | PlateLocHeight > 3.84, 
+                               ifelse(PitchCall != "StrikeCalled", 1,0), 
+                               0)))%>%
+  mutate(Barrel = ifelse(ExitSpeed > 88 & Angle > 5 & Angle < 29, 1, 0))%>%
+  mutate(PitchType = ifelse(TaggedPitchType == 'Four-Seam' | TaggedPitchType == "Sinker", 'Fastball', 'Offspeed'))%>%
+  mutate(OB = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun' | PlayResult == 'Walk', 1, 0))%>%
+  mutate(TB = ifelse(PlayResult == 'Single', 1, 
+                     ifelse(PlayResult == 'Double', 2, 
+                            ifelse(PlayResult == 'Triple', 3, 
+                                   ifelse(PlayResult == 'HomeRun', 4, 0)))))%>%
+  mutate(K = ifelse(PlayResult == 'Strikeout', 1, 0))%>%
+  mutate(Swing = ifelse(PitchCall == 'StrikeSwinging' | PitchCall == 'FoulBall' | PitchCall == 'InPlay', 1, 0))%>%
+  mutate(InPlay = ifelse(PitchCall == 'InPlay', 1, 0))%>%
+  mutate(SwingMiss = ifelse(Swing == 1 & InPlay == 1, 0, 
+                            ifelse(PitchCall == 'FoulBall', 0, 1)))%>%
+  mutate(Count = 1)%>%
+  mutate(xBABIP = ifelse(PitchCall == 'InPlay', predict(fit_2, x_2, type = "response"), NA))%>%
+ mutate(Ball = ifelse(PitchCall == "BallCalled" | PitchCall == "HitByPitch" | PitchCall == "BallinDirt", 1, 0))%>%
+  mutate(Strike = ifelse(PitchCall == "BallCalled" | PitchCall == "HitByPitch" | PitchCall == "BallinDirt", 0, 1))
+
+
+```
+
+# Basic Pitch Stats
+
+```{r echo=FALSE}
+
+x <- x%>%
+  filter(!is.na(RelSpeed))%>%
+  filter(!is.na(SpinRate))%>%
+  filter(!is.na(VertBreak))%>%
+  filter(!is.na(HorzBreak))%>%
+  filter(AutoPitchType != "")
+
+x <- x%>%
+  mutate(Tilt = hms2rad(Tilt))
+
+x <- x%>%
+  mutate(Tilt = (Tilt*(180/pi)))
+
+y <- aggregate(list(x$RelSpeed, x$SpinRate, x$InducedVertBreak, x$HorzBreak, x$Tilt), by = list(x$Pitcher, x$AutoPitchType), FUN = mean)
+
+colnames(y) = c('Pitcher', 'Pitch', 'Velo', 'Spin Rate', 'Vert Break', 'Horizontal Break', "Tilt")
+
+y1 <- aggregate(list(x$Count, x$Ball, x$Strike), by = list(x$Pitcher, x$AutoPitchType), FUN = sum)
+
+colnames(y1) <- c("Pitcher", "Pitch", "N", "Balls", "Strikes")
+
+y <- merge(y1, y, by = c("Pitcher", "Pitch"))
+
+y <- y%>%
+  mutate(Strike_Percentage = percent(Strikes/N,2))%>%
+  mutate(Ball_Percentage = percent(Balls/N,2))
+
+y2 <- y[c(1:5, 11, 12)]
+
+regulartable(y2)%>%
+  autofit()
+
+regulartable(y)%>%
+  autofit()
+```
+
+```{r}
+Sparks_UValley1 <- x %>%
+   filter(BatterTeam == "UPP_VAL", Date == "2023-06-10") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak)
+
+regulartable(Sparks_UValley1)%>%
+  autofit()
+
+```
+
+```{r}
+Sparks_Sanford <- x %>%
+   filter(BatterTeam == "SAN_MAI") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak)
+
+regulartable(Sparks_Sanford)%>%
+  autofit()
+```
+
+```{r}
+Sparks_Newport <- x %>%
+   filter(BatterTeam == "NEW_GUL") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak)
+
+regulartable(Sparks_Newport)%>%
+  autofit()
+```
+
+```{r}
+Sparks_UValley2 <- x %>%
+   filter(BatterTeam == "UPP_VAL", Date == "2023-07-03") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak)
+
+regulartable(Sparks_UValley2)%>%
+  autofit()
+
+```
+
+```{r}
+Sparks_NAdams <- x %>%
+  filter(BatterTeam == "NOR_ADA") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak) 
+
+regulartable(Sparks_NAdams)%>%
+  autofit()
+```
+
+```{r}
+Sparks_Keene <- x %>%
+  filter(BatterTeam == "KEE_SWA") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak) 
+
+regulartable(Sparks_Keene)%>%
+  autofit()
+```
+
+```{r}
+Sparks_Sanford2 <- x %>%
+   filter(BatterTeam == "SAN_MAI", Date == "2023-07-26") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak)
+
+regulartable(Sparks_Sanford2)%>%
+  autofit()
+```
+
+```{r}
+Sparks_Danbury <- x %>%
+   filter(BatterTeam == "DAN_WES") %>%
+  select(Pitcher, AutoPitchType, RelSpeed, SpinRate, Tilt, HorzBreak, InducedVertBreak)
+
+regulartable(Sparks_Danbury)%>%
+  autofit()
+```
+
+```{r include = FALSE, echo = FALSE}
+## Graphing functions
+
+grid_predict <- function(fit){
+  grid <- expand.grid(PlateLocSide = seq(-1.75, 1.75, length=50),
+                      PlateLocHeight = seq(0, 4.5, length=50))
+  grid$lp <- predict(fit, grid, type = "response")
+  grid
+}
+
+add_zone <- function(Color = "black"){
+  topKzone <- 3.5
+  botKzone <- 1.6
+  inKzone <- -0.85
+  outKzone <- 0.85
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+              lwd=1, col=Color)
+}
+
+add_heart <- function(Color = "Red"){
+  topKzone <- 3.26
+  botKzone <- 1.84
+  inKzone <- -0.55
+  outKzone <- 0.55
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+              lwd=1, col=Color)
+}
+
+add_shadow <- function(Color = "Grey"){
+  topKzone <- 3.84
+  botKzone <- 1.16
+  inKzone <- -1.13
+  outKzone <- 1.13
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+              lwd=1, col=Color)
+}
+
+swingR <- function(n){
+  cols <- c('1' = 'Red', '0' = 'Blue')
+  
+  x <- x%>%
+    filter(Batter == n)%>%
+    mutate(Swing = as.factor(Swing))%>%
+    mutate(Chase = as.factor(Chase))
+  
+  x %>%
+    ggplot()+
+    geom_point(aes(x = PlateLocSide, y=PlateLocHeight, color = Swing, shape = Chase), size = 4)+
+    facet_wrap(~PitchType)+
+    add_zone()+
+    add_heart()+
+    add_shadow()+
+    xlim(-2, 2) +
+    ylim(0.0, 5)  +
+    coord_fixed()+
+    labs(title = paste(n, 'Swings/Takes'), caption = "Negative PlateLocSide is Outside to a RHH")+
+    scale_color_manual(values = cols)
+}
+
+contour_graph <- function(df, L, title){
+  
+  ggplot(df)  +
+    geom_contour_fill(aes(x=PlateLocSide,
+                          y=PlateLocHeight,
+                          z=lp),
+                      breaks=c(L),
+                      size=1.5) +
+    scale_fill_distiller(palette="Spectral") +
+    add_zone("black") +
+    add_heart()+
+    add_shadow()+
+    xlim(-2, 2) +
+    ylim(0.0, 4.0)  +
+    coord_fixed() +
+    ggtitle(title) +
+    centertitle() +
+    increasefont()
+}
+```
+
+```{r include=FALSE, echo=FALSE}
+
+swingR <- function(n){
+  cols <- c('1' = 'Red', '0' = 'Blue')
+  
+  x <- x%>%
+    filter(Pitcher == n)%>%
+    mutate(Swing = as.factor(Swing))%>%
+    mutate(Chase = as.factor(Chase))
+  
+  x %>%
+    ggplot()+
+    geom_point(aes(x = PlateLocSide, y=PlateLocHeight, color = Swing, shape = Chase), size = 3)+
+    facet_wrap(~AutoPitchType)+
+    add_zone()+
+    add_heart()+
+    add_shadow()+
+    xlim(-2, 2) +
+    ylim(0.0, 5)  +
+    coord_fixed()+
+    labs(title = paste(n, 'Swings/Takes'), caption = "Negative PlateLocSide is Outside to a RHH")+
+    scale_color_manual(values = cols)
+}
+
+```
+
+```{r echo=FALSE}
+
+myplots <- vector('list')
+
+for (i in pitchers) {
+    myplots[[i]] <- local({
+        i <- i
+        p1 <- swingR(i)
+        print(p1)
+    })
+}
+
+
+```
+
+```{r}
+x %>%
+  ggplot() +
+  geom_point(aes(x=HorzBreak, y=InducedVertBreak, color = AutoPitchType, size = 1))+
+  xlim(-25, 25) +
+  ylim(-25, 25) 
+```

@@ -1,0 +1,63 @@
+---
+title: "Arms_Slot_2023"
+output: html_document
+date: "2023-06-09"
+---
+
+Load/Prep Data
+
+```{r echo=FALSE, include=FALSE}
+
+library(tidyverse)
+library(ggrepel)
+
+all_data <- read.csv("~/Desktop/Mountaineers/Mountaineers/2023Complete.CSV", header = TRUE)
+
+vtmp <- all_data%>%
+  filter(PitcherTeam == 'VER_MOU')
+
+armslot <- aggregate(list(vtmp$RelHeight, vtmp$RelSide, vtmp$Extension), by = list(vtmp$Pitcher), FUN = mean)
+
+colnames(armslot) = c("Pitcher", "RelHeight", "RelSide", "Extension")
+
+
+armslot <- armslot %>%
+  mutate(RelSide = -RelSide)
+
+```
+
+
+Graph
+
+```{r echo=FALSE}
+
+x = 0
+
+armslot%>%
+  ggplot()+
+  geom_point(aes(x = RelSide, y = RelHeight))+
+  geom_text_repel(aes(x = RelSide, y = RelHeight, label = Pitcher), size = 3, max.overlaps = 100)+
+  xlim(-5, 5)+
+  ylim(2, 7)+
+  coord_fixed()+
+   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  geom_vline(xintercept = 0, linetype = 'dashed', color = 'red')
+  
+
+```
+
+3D Graph
+
+```{r}
+
+#library("scatterplot3d")
+#library(plot3D)
+
+#as3d <- scatterplot3d(x = armslot$RelSide, z = armslot$RelHeight, y = armslot$Extension)
+
+#scatterplot3d(x = armslot$RelSide, z = armslot$RelHeight, y = armslot$Extension, angle = 140)
+
+#text3D(x = armslot$RelSide, z = armslot$RelHeight, y = armslot$Extension, labels = armslot$Pitcher)
+
+```

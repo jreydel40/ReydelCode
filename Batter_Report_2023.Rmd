@@ -1,0 +1,402 @@
+---
+title: "Batter_Report_2023"
+output: html_document
+date: "2023-06-09"
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include = FALSE, echo = FALSE}
+
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(pitchRx)
+library(Lahman)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(flextable)
+library(xgboost)
+
+
+load("~/Desktop/Neers_To_Send/Batters/xBAD1.rda")
+
+x <- read_csv("~/Desktop/Mountaineers/Mountaineers/2023Complete.CSV")
+
+x <- x%>%
+  filter(BatterTeam == "VER_MOU")
+
+batters <- unique(x$Batter)
+
+
+
+x <- x%>%
+   mutate(PlayResult = ifelse(KorBB == 'Walk', 'Walk', 
+                             ifelse(KorBB == 'Strikeout', 'Strikeout', x$PlayResult)))%>%
+  mutate(Hit = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun', 1, 0))
+
+x_2 <- xgb.DMatrix(data = as.matrix(x[c(47:49, 56)]), label = x$Hit)
+
+x <- x%>%
+  mutate(AB = ifelse(PlayResult == 'Undefined' | PlayResult == 'Walk' | PlayResult == 'Error' | PlayResult == 'Sacrifice', 0, 1))%>%
+  mutate(PA = ifelse(PlayResult == 'Undefined', 0, 1))%>%
+  mutate(Chase = ifelse(PitchCall == "BallCalled" | PitchCall == "HitByPitch" | PitchCall == "BallinDirt", 0, 
+                        ifelse(PlateLocSide > 1.13 | PlateLocSide < -1.13 | PlateLocHeight < 1.16 | PlateLocHeight > 3.84, 
+                               ifelse(PitchCall != "StrikeCalled", 1,0), 
+                               0)))%>%
+  mutate(Barrel = ifelse(ExitSpeed > 88 & Angle > 5 & Angle < 30, 1, 0))%>%
+  mutate(PitchType = ifelse(TaggedPitchType == 'Four-Seam' | TaggedPitchType == "Sinker", 'Fastball', 'Offspeed'))%>%
+  mutate(OB = ifelse(PlayResult == 'Single' | PlayResult == 'Double' | PlayResult == 'Triple' | PlayResult == 'HomeRun' | PlayResult == 'Walk', 1, 0))%>%
+  mutate(TB = ifelse(PlayResult == 'Single', 1, 
+                     ifelse(PlayResult == 'Double', 2, 
+                            ifelse(PlayResult == 'Triple', 3, 
+                                   ifelse(PlayResult == 'HomeRun', 4, 0)))))%>%
+  mutate(K = ifelse(PlayResult == 'Strikeout', 1, 0))%>%
+  mutate(Swing = ifelse(PitchCall == 'StrikeSwinging' | PitchCall == 'FoulBall' | PitchCall == 'InPlay', 1, 0))%>%
+  mutate(InPlay = ifelse(PitchCall == 'InPlay', 1, 0))%>%
+  mutate(xBABIP = ifelse(PitchCall == 'InPlay', predict(fit_2, x_2, type = "response"), NA))%>%
+  mutate(SwingMiss = ifelse(Swing == 1 & InPlay == 1, 0, 
+                            ifelse(PitchCall == 'FoulBall', 0, 1)))
+
+
+```
+
+
+```{r include = TRUE, echo = FALSE}
+## Graphing functions
+
+grid_predict <- function(fit){
+  grid <- expand.grid(PlateLocSide = seq(-1.75, 1.75, length=50),
+                      PlateLocHeight = seq(0, 4.5, length=50))
+  grid$lp <- predict(fit, grid, type = "response")
+  grid
+}
+
+add_zone <- function(Color = "black"){
+  topKzone <- 3.5
+  botKzone <- 1.6
+  inKzone <- -0.85
+  outKzone <- 0.85
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+              lwd=1, col=Color)
+}
+
+add_heart <- function(Color = "Red"){
+  topKzone <- 3.26
+  botKzone <- 1.84
+  inKzone <- -0.55
+  outKzone <- 0.55
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+              lwd=1, col=Color)
+}
+
+add_shadow <- function(Color = "Grey"){
+  topKzone <- 3.84
+  botKzone <- 1.16
+  inKzone <- -1.13
+  outKzone <- 1.13
+  kZone <- data.frame(
+    x=c(inKzone, inKzone, outKzone, outKzone, inKzone),
+    y=c(botKzone, topKzone, topKzone, botKzone, botKzone)
+  )
+  geom_path(aes(.data$x, .data$y), data=kZone,
+              lwd=1, col=Color)
+}
+
+swingR <- function(n){
+  cols <- c('1' = 'Red', '0' = 'Blue')
+  
+  x <- x%>%
+    filter(Batter == n)%>%
+    mutate(Swing = as.factor(Swing))%>%
+    mutate(Chase = as.factor(Chase))
+  
+  x %>%
+    ggplot()+
+    geom_point(aes(x = PlateLocSide, y=PlateLocHeight, color = Swing, shape = Chase), size = 4)+
+    facet_wrap(~PitchType)+
+    add_zone()+
+    add_heart()+
+    add_shadow()+
+    xlim(-2, 2) +
+    ylim(0.0, 5)  +
+    coord_fixed()+
+    labs(title = paste(n, 'Swings/Takes'), caption = "Negative PlateLocSide is Outside to a RHH")+
+    scale_color_manual(values = cols)
+}
+
+contour_graph <- function(df, L, title){
+  
+  ggplot(df)  +
+    geom_contour_fill(aes(x=PlateLocSide,
+                          y=PlateLocHeight,
+                          z=lp),
+                      breaks=c(L),
+                      size=1.5) +
+    scale_fill_distiller(palette="Spectral") +
+    add_zone("black") +
+    add_heart()+
+    add_shadow()+
+    xlim(-2, 2) +
+    ylim(0.0, 4.0)  +
+    coord_fixed() +
+    ggtitle(title)
+}
+```
+
+
+# Simple Boxscore
+
+```{r echo = FALSE}
+
+## Boxscore stats
+
+boxscore <- x[, c(10, 168:172, 174:176)]
+
+boxscore[is.na(boxscore)]= 0
+
+boxscore <- aggregate(list(boxscore$Hit, boxscore$AB, boxscore$PA, boxscore$OB, boxscore$TB, boxscore$K, boxscore$Chase, boxscore$Barrel), by = list(boxscore$Batter), FUN = sum)
+
+colnames(boxscore) = c('Batter', 'Hits', 'AB', 'PA', 'OB', 'TB', 'K', 'Chases', 'Barrels')
+
+
+boxscore <- boxscore%>%
+  mutate(Avg = round(Hits/AB, 3))%>%
+  mutate(OBP = round(OB/PA, 3))%>%
+  mutate(SLG = round(TB/AB, 3))%>%
+  mutate(OPS = SLG + OBP)%>%
+  mutate('K%' = round(K/AB, 3))
+
+boxscore <- boxscore[, c(1, 4, 8:14)]
+
+regulartable(boxscore)%>%
+  autofit()
+
+```
+
+
+
+# Chase Graphs
+
+```{r include = FALSE, echo=FALSE}
+
+cols <- c('Fastball' = 'Red', 'Offspeed' = 'Blue')
+
+chasR <- function(n){
+  
+  y <- x %>%
+  filter(Batter == n)
+  
+  y%>%
+  filter(Chase == "1")%>%
+  ggplot()+
+  geom_point(aes(x = PlateLocSide, y=PlateLocHeight, color = PitchType), size = 2)+
+  add_zone()+
+  add_heart()+
+  add_shadow()+
+  xlim(-2, 2) +
+  ylim(0.0, 5)+
+  coord_fixed()+
+  labs(title = paste0(n, " Chases"), caption = "Negative PlateLocSide is Outside to a RHH")+
+  scale_color_manual(values = cols)
+ 
+  
+}
+
+
+
+```
+
+```{r echo = FALSE}
+
+myplots <- vector('list')
+
+for (i in batters) {
+    myplots[[i]] <- local({
+        i <- i
+        p1 <- chasR(i)
+        print(p1)
+    })
+}
+
+```
+
+
+# Barrel Graphs
+
+```{r include = FALSE, echo=FALSE}
+
+barrelR <- function(n){
+  
+  y <- x %>%
+  filter(Batter == n)
+  
+  y%>%
+  filter(Barrel == "1")%>%
+  ggplot()+
+  geom_point(aes(x = PlateLocSide, y=PlateLocHeight, color = Barrel))+
+  add_zone()+
+  add_heart()+
+  add_shadow()+
+  xlim(-2, 2) +
+  ylim(0.0, 5)  +
+  coord_fixed()+
+  labs(title = paste0(n, " Barrels"), caption = "Negative PlateLocSide is Outside to a RHH")
+  
+}
+
+
+```
+
+```{r echo = FALSE}
+
+myplots <- vector('list')
+
+for (i in batters) {
+    myplots[[i]] <- local({
+        i <- i
+        p1 <- barrelR(i)
+        print(p1)
+    })
+}
+
+```
+
+# Swing Decision Plots
+
+```{r echo=FALSE}
+
+myplots <- vector('list')
+
+for (i in batters) {
+    myplots[[i]] <- local({
+        i <- i
+        p1 <- swingR(i)
+        print(p1)
+    })
+}
+
+```
+
+# Swing Probability Plots
+
+```{r include = FALSE, echo=FALSE}
+
+swing_probR <- function(n){
+  
+  gam(Swing ~ s(PlateLocSide, PlateLocHeight),
+    family=binomial,
+    data=x%>%filter(Batter == n))%>%
+  grid_predict()%>%
+  contour_graph(L=seq(0, 1, by=.01), title = paste(n))+labs(subtitle = "Swing Probability (Attack Regions)")+
+  theme(plot.subtitle = element_text(colour = "black", size = 10, hjust = 0.5, vjust = 0.8, angle = 0))
+}
+
+```
+
+```{r echo = FALSE}
+
+#myplots <- vector('list')
+
+#for (i in batters) {
+ #   myplots[[i]] <- local({
+  #      i <- i
+   #     p1 <- swing_probR(i)
+    #    print(p1)
+    #})
+#}
+
+```
+
+# xBA Boxscore
+
+```{r echo=FALSE, include=FALSE}
+
+boxscore <- x
+
+#boxscore[is.na(boxscore)] = 0
+
+boxscore <- aggregate(list(boxscore$Hit, boxscore$AB, boxscore$PA, boxscore$OB, boxscore$TB, boxscore$K, boxscore$Chase, boxscore$Barrel), by = list(boxscore$Batter), FUN = sum)
+
+colnames(boxscore) = c('Batter', 'Hits', 'AB', 'PA', 'OB', 'TB', 'K', 'Chases', 'Barrels')
+
+boxscore <- boxscore%>%
+  mutate(Avg = round(Hits/AB, 3))%>%
+  mutate(OBP = round(OB/PA, 3))%>%
+  mutate(SLG = round(TB/AB, 3))%>%
+  mutate(OPS = SLG + OBP)%>%
+  mutate('K%' = round(K/AB, 3))
+
+boxscore <- boxscore[, c(1, 2, 3, 4, 8:14)]
+
+
+x2 <- x%>%
+  filter(!is.na(xBABIP))
+
+box1 <- aggregate(x2, by = list(x2$Batter), FUN = mean)
+
+box1 <- box1[, c(1,180)]
+
+colnames(box1) = c('Batter', 'xBABIP')
+
+boxscore <- right_join(boxscore, box1, by = c('Batter'))
+
+boxscore <- boxscore[, c(1:4, 7:12)]
+
+boxscore <- boxscore%>%
+  mutate(xBA = (1-boxscore$`K%`)*xBABIP)%>%
+  mutate(xBA = round(xBA, 3))%>%
+  mutate(xBABIP = round(xBABIP, 3))
+
+boxscore<- boxscore%>%
+  mutate(xBADiff = Avg-xBA)%>%
+  mutate(xBADiff = round(xBADiff, 3))
+  
+boxscore <- boxscore%>%
+  mutate(xHits = round((xBA * AB),0))%>%
+  mutate(xHitsDiff = Hits - xHits)
+```
+
+```{r echo=FALSE}
+
+regulartable(boxscore)%>%
+  autofit()
+
+```
+
+# xBA Visuals
+
+```{r echo = FALSE}
+
+boxscore%>%
+  ggplot()+
+  geom_col(aes(x = Batter, y = xBADiff))+  
+scale_x_discrete(guide = guide_axis(n.dodge=3))+
+  labs(title = 'xBA Differential')
+
+
+boxscore%>%
+  ggplot()+
+  geom_col(aes(x = Batter, y = xHitsDiff), fill = 'light grey')+ 
+  geom_text(aes(x = Batter, y=xHitsDiff, label = xHitsDiff), color = 'Blue', size = 5)+
+scale_x_discrete(guide = guide_axis(n.dodge=3))+
+  labs(title = 'xHits Differential')
+
+
+```

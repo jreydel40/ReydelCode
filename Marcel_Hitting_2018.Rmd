@@ -1,0 +1,527 @@
+---
+title: "Marcel_2018_Proj"
+output: html_document
+date: "2024-06-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(xgboost)
+library(flextable)
+library(formattable)
+library(astroFns)
+library(grid)
+library(tibble)
+library(RODBC)
+library(odbc)
+library(sqldf)
+```
+
+```{r}
+db_intern_connection <- odbcDriverConnect(paste('driver={SQL Server};server=OPSDBOAK85',
+                                            Sys.getenv("SERVER"),
+                                            ';database=mlb_stats',
+                                            Sys.getenv("DATABASE"),
+                                            ';trusted_connection=true', sep = ""))
+```
+
+```{r}
+query2015 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2015 AND d.LeagueLevel = 1" 
+mlb_stats_2015 <- sqlQuery(db_intern_connection, query2015)
+print(mlb_stats_2015)
+
+```
+
+
+```{r}
+query2016 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2016 AND d.LeagueLevel = 1"
+mlb_stats_2016 <- sqlQuery(db_intern_connection, query2016)
+print(mlb_stats_2016)
+
+```
+
+```{r}
+query2017 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2017 AND d.LeagueLevel = 1"
+mlb_stats_2017 <- sqlQuery(db_intern_connection, query2017)
+print(mlb_stats_2017)
+
+```
+
+```{r}
+query2018 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2018 AND d.LeagueLevel = 1"
+mlb_stats_2018 <- sqlQuery(db_intern_connection, query2018)
+print(mlb_stats_2018)
+
+```
+
+```{r}
+write.csv(mlb_stats_2015, "mlb_stats_2015.csv", row.names = FALSE)
+write.csv(mlb_stats_2016, "mlb_stats_2016.csv", row.names = FALSE)
+write.csv(mlb_stats_2017, "mlb_stats_2017.csv", row.names = FALSE)
+write.csv(mlb_stats_2018, "mlb_stats_2018.csv", row.names = FALSE)
+```
+
+
+```{r}
+mlb_stats_2015_df <- read_csv("mlb_stats_2015.csv")
+mlb_stats_2016_df <- read_csv("mlb_stats_2016.csv")
+mlb_stats_2017_df <- read_csv("mlb_stats_2017.csv")
+mlb_stats_2018_df <- read_csv("mlb_stats_2018.csv")
+
+
+```
+
+
+```{r}
+cols_to_select <- c("Name", "PlayerID", "TeamID", "Season", "Age", "G", "PA", "AB", "H", 
+                    "B1", "B2", "B3", "HR", "BB", "SO", "AVG", "OBP", "SLG", "TB", 
+                    "HBP", "SH", "SF")
+
+mlb_stats_2015_selected <- mlb_stats_2015_df[, cols_to_select]
+mlb_stats_2016_selected <- mlb_stats_2016_df[, cols_to_select]
+mlb_stats_2017_selected <- mlb_stats_2017_df[, cols_to_select]
+
+mlb_stats_2015_selected <- mlb_stats_2015_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+mlb_stats_2016_selected <- mlb_stats_2016_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+mlb_stats_2017_selected <- mlb_stats_2017_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+
+mlb_stats_2018_df <- mlb_stats_2018_df %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+```
+
+```{r}
+numeric_columns <- c("G", "PA", "AB", "H", "B1", "B2", "B3", "HR", "BB", "SO", "AVG", "OBP", "SLG", "TB", "HBP", "SH", "SF", "BBRate", "KRate")
+
+mlb_stats_2017_weighted <- mlb_stats_2017_selected[, numeric_columns] * 5
+mlb_stats_2016_weighted <- mlb_stats_2016_selected[, numeric_columns] * 4
+mlb_stats_2015_weighted <- mlb_stats_2015_selected[, numeric_columns] * 3
+```
+
+```{r}
+mlb_stats_2015_weighted <- cbind(mlb_stats_2015_selected[, setdiff(names(mlb_stats_2015_selected), numeric_columns)], mlb_stats_2015_weighted)
+mlb_stats_2016_weighted <- cbind(mlb_stats_2016_selected[, setdiff(names(mlb_stats_2016_selected), numeric_columns)], mlb_stats_2016_weighted)
+mlb_stats_2017_weighted <- cbind(mlb_stats_2017_selected[, setdiff(names(mlb_stats_2017_selected), numeric_columns)], mlb_stats_2017_weighted)
+```
+
+
+```{r}
+combined_stats <- left_join(mlb_stats_2015_weighted, mlb_stats_2016_weighted, by = "PlayerID", suffix = c("_2015", "_2016"))
+
+combined_stats <- left_join(combined_stats, mlb_stats_2017_weighted, by = "PlayerID", suffix = c("", "_2017"))
+combined_stats_filter <- combined_stats %>%
+  filter(!is.na(PA_2015) & !is.na(PA_2016) & !is.na(PA))
+combined_stats_unique <- combined_stats_filter %>%
+  distinct(Name, .keep_all = TRUE)
+```
+```{r}
+combined_stats_weighted <- combined_stats_unique %>%
+  mutate(weighted_PA = (PA_2015 + PA_2016 + PA) / 12) %>%
+  mutate(weighted_G = (G_2015 + G_2016 + G) / 12) %>%
+  mutate(weighted_AB = (AB_2015 + AB_2016 + AB) / 12) %>%
+  mutate(weighted_H = (H_2015 + H_2016 + H) / 12) %>%
+  mutate(weighted_B1 = (B1_2015 + B1_2016 + B1) / 12) %>%
+  mutate(weighted_B2 = (B2_2015 + B2_2016 + B2) / 12) %>%
+  mutate(weighted_B3 = (B3_2015 + B3_2016 + B3) / 12) %>%
+  mutate(weighted_HR = (HR_2015 + HR_2016 + HR) / 12) %>%
+  mutate(weighted_BB = (BB_2015 + BB_2016 + BB) / 12) %>%
+  mutate(weighted_SO = (SO_2015 + SO_2016 + SO) / 12) %>%
+  mutate(weighted_AVG = (AVG_2015 + AVG_2016 + AVG) / 12) %>%
+  mutate(weighted_OBP = (OBP_2015 + OBP_2016 + OBP) / 12) %>%
+  mutate(weighted_SLG = (SLG_2015 + SLG_2016 + SLG) / 12) %>%
+  mutate(weighted_TB = (TB_2015 + TB_2016 + TB) / 12) %>%
+  mutate(weighted_HBP = (HBP_2015 + HBP_2016 + HBP) / 12) %>%
+  mutate(weighted_SH = (SH_2015 + SH_2016 + SH) / 12) %>%
+  mutate(weighted_SF = (SF_2015 + SF_2016 + SF) / 12) %>%
+  mutate(weighted_BBRate = (BBRate_2015 + BBRate_2016 + BBRate) / 12) %>%
+  mutate(weighted_KRate = (KRate_2015 + KRate_2016 + KRate) / 12) 
+```
+
+```{r}
+weighted_stats <- combined_stats_weighted %>%
+  select(Name, PlayerID, weighted_PA, weighted_G, weighted_AB, 
+         weighted_H, weighted_B1, weighted_B2, weighted_B3, 
+         weighted_HR, weighted_BB, weighted_SO, 
+         weighted_AVG, weighted_OBP, weighted_SLG, 
+         weighted_TB, weighted_HBP, weighted_SH, weighted_SF, weighted_BBRate, weighted_KRate) %>%
+  filter(weighted_PA >= 400)
+```
+
+```{r}
+merged_stats_w_2018 <- left_join(mlb_stats_2018_df, weighted_stats, by = c("PlayerID", "Name"))
+merged_stats_w_2018 <- merged_stats_w_2018 %>%
+  filter(!is.na(weighted_PA))
+```
+
+```{r}
+age_adjustment <- function(age) {
+  ifelse(is.na(age), 1,
+    ifelse(age <= 0, 1,
+      ifelse(age > 29, 1 / (1 + 0.01 * (age - 29)),
+        1 + 0.003 * (29 - age)
+      )
+    )
+  )
+}
+```
+
+```{r}
+merged_stats_w_2018 <- merged_stats_w_2018 %>%
+  mutate(age_adjustment_factor = age_adjustment(Age)) %>%
+  filter(PA>=400)
+```
+
+```{r}
+age_adj_stats_w_2018 <- merged_stats_w_2018 %>%
+  mutate(proj_AVG = weighted_AVG * age_adjustment(Age)) %>%
+  mutate(proj_OBP = weighted_OBP * age_adjustment(Age)) %>%
+  mutate(proj_SLG = weighted_SLG * age_adjustment(Age)) %>%
+  mutate(proj_HR = weighted_HR * age_adjustment(Age)) %>%
+  mutate(proj_BBRate = weighted_BBRate * age_adjustment(Age)) %>%
+  mutate(proj_KRate = weighted_KRate * (2-age_adjustment(Age)))
+
+age_adj_stats_w_2018 <- age_adj_stats_w_2018 %>%
+  mutate(perc_diff_AVG = ((AVG - proj_AVG) / AVG) * 100,
+         perc_diff_OBP = ((OBP - proj_OBP) / OBP) * 100,
+         perc_diff_SLG = ((SLG - proj_SLG) / SLG) * 100,
+         perc_diff_HR = ((HR - proj_HR) / HR) * 100,
+         perc_diff_BBRate = ((BBRate - proj_BBRate) / BBRate) * 100,
+         perc_diff_KRate = ((KRate - proj_KRate) / KRate) * 100)
+
+```
+
+```{r}
+selected_stats <- age_adj_stats_w_2018 %>%
+  select(Name, Age, PA, AVG, proj_AVG, perc_diff_AVG, OBP, proj_OBP, perc_diff_OBP, SLG, proj_SLG, perc_diff_SLG, HR, proj_HR, perc_diff_HR, BBRate,  proj_BBRate, perc_diff_BBRate, KRate,  proj_KRate, perc_diff_KRate)
+print(selected_stats)
+```
+
+```{r}
+age_adj_stats_w_2018 <- age_adj_stats_w_2018 %>%
+  mutate(total_perc_diff = perc_diff_AVG + perc_diff_OBP + perc_diff_SLG + 
+                            perc_diff_BBRate + perc_diff_KRate)
+selected_stats_2018 <- age_adj_stats_w_2018 %>%
+  select(Name, Age, PA, AVG, proj_AVG, perc_diff_AVG, OBP, proj_OBP, perc_diff_OBP, 
+         SLG, proj_SLG, perc_diff_SLG, HR, proj_HR, perc_diff_HR, BBRate, proj_BBRate, 
+         perc_diff_BBRate, KRate, proj_KRate, perc_diff_KRate, total_perc_diff)
+
+print(selected_stats_2018)
+
+model_performance_2018 <- selected_stats_2018 %>%
+  summarise(sum_perc_diff = sum(total_perc_diff)/nrow(selected_stats_2018))
+model_performance_2018
+```
+
+```{r}
+# Linear regression models
+model_avg <- lm(AVG ~ proj_AVG, data = selected_stats)
+model_obp <- lm(OBP ~ proj_OBP, data = selected_stats)
+model_slg <- lm(SLG ~ proj_SLG, data = selected_stats)
+
+# Summarize models
+summary(model_avg)
+summary(model_obp)
+summary(model_slg)
+
+# Scatter plot with linear regression line for AVG
+ggplot(selected_stats, aes(x = proj_AVG, y = AVG)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected AVG",
+       x = "Projected AVG",
+       y = "Actual AVG") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for OBP
+ggplot(selected_stats, aes(x = proj_OBP, y = OBP)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected OBP",
+       x = "Projected OBP",
+       y = "Actual OBP") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for SLG
+ggplot(selected_stats, aes(x = proj_SLG, y = SLG)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected SLG",
+       x = "Projected SLG",
+       y = "Actual SLG") +
+  theme_minimal()
+
+
+
+```
+
+
+
+```{r}
+selected_stats <- selected_stats %>%
+  mutate(residual_avg = residuals(model_avg),
+         residual_obp = residuals(model_obp),
+         residual_slg = residuals(model_slg))
+
+# Scatter plot with linear regression line for AVG and residuals
+ggplot(selected_stats, aes(x = proj_AVG, y = AVG)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected AVG",
+       x = "Projected AVG",
+       y = "Actual AVG") +
+  theme_minimal() +
+  geom_segment(aes(xend = proj_AVG, yend = AVG - residual_avg), color = "gray")
+
+# Scatter plot with linear regression line for OBP and residuals
+ggplot(selected_stats, aes(x = proj_OBP, y = OBP)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected OBP",
+       x = "Projected OBP",
+       y = "Actual OBP") +
+  theme_minimal() +
+  geom_segment(aes(xend = proj_OBP, yend = OBP - residual_obp), color = "gray")
+
+# Scatter plot with linear regression line for SLG and residuals
+ggplot(selected_stats, aes(x = proj_SLG, y = SLG)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected SLG",
+       x = "Projected SLG",
+       y = "Actual SLG") +
+  theme_minimal() +
+  geom_segment(aes(xend = proj_SLG, yend = SLG - residual_slg), color = "gray")
+
+```
+
+
+
+

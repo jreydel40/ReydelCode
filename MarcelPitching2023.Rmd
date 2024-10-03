@@ -1,0 +1,569 @@
+---
+title: "MarcelPitching2023"
+output: html_document
+date: "2024-07-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(xgboost)
+library(flextable)
+library(formattable)
+library(astroFns)
+library(grid)
+library(tibble)
+library(RODBC)
+library(odbc)
+library(sqldf)
+```
+
+```{r}
+db_intern_connection <- odbcDriverConnect(paste('driver={SQL Server};server=OPSDBOAK85',
+                                            Sys.getenv("SERVER"),
+                                            ';database=mlb_stats',
+                                            Sys.getenv("DATABASE"),
+                                            ';trusted_connection=true', sep = ""))
+```
+
+```{r}
+pitchingstatsquery2020 <- "
+SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[GS]
+      ,[W]
+      ,[L]
+      ,[SV]
+      ,[IP_Outs]
+      ,[IP]
+      ,[ERA]
+      ,[PA]
+      ,[AB]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[R]
+      ,[ER]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[WP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[InheritedRunners]
+      ,[InheritedRunScored]
+      ,[QS]
+      ,[GF]
+      ,[FIPAdj]
+      ,[FIPAdjMinus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_pitcher_basic]
+  WHERE LeagueLevel = 1 AND GameType = 'R' AND PA > 100 AND Season = 2020
+"
+
+pitchingstats2020 <- sqlQuery(db_intern_connection, pitchingstatsquery2020)
+
+print(pitchingstats2020)
+```
+
+
+```{r}
+pitchingstatsquery2021 <- "
+SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[GS]
+      ,[W]
+      ,[L]
+      ,[SV]
+      ,[IP_Outs]
+      ,[IP]
+      ,[ERA]
+      ,[PA]
+      ,[AB]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[R]
+      ,[ER]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[WP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[InheritedRunners]
+      ,[InheritedRunScored]
+      ,[QS]
+      ,[GF]
+      ,[FIPAdj]
+      ,[FIPAdjMinus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_pitcher_basic]
+  WHERE LeagueLevel = 1 AND GameType = 'R' AND PA > 100 AND Season = 2021
+"
+
+pitchingstats2021 <- sqlQuery(db_intern_connection, pitchingstatsquery2021)
+
+print(pitchingstats2021)
+```
+```{r}
+pitchingstatsquery2022 <- "
+SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[GS]
+      ,[W]
+      ,[L]
+      ,[SV]
+      ,[IP_Outs]
+      ,[IP]
+      ,[ERA]
+      ,[PA]
+      ,[AB]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[R]
+      ,[ER]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[WP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[InheritedRunners]
+      ,[InheritedRunScored]
+      ,[QS]
+      ,[GF]
+      ,[FIPAdj]
+      ,[FIPAdjMinus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_pitcher_basic]
+  WHERE LeagueLevel = 1 AND GameType = 'R' AND PA > 100 AND Season = 2022
+"
+
+pitchingstats2022 <- sqlQuery(db_intern_connection, pitchingstatsquery2022)
+
+print(pitchingstats2022)
+```
+
+
+```{r}
+pitchingstatsquery2023 <- "
+SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[GS]
+      ,[W]
+      ,[L]
+      ,[SV]
+      ,[IP_Outs]
+      ,[IP]
+      ,[ERA]
+      ,[PA]
+      ,[AB]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[R]
+      ,[ER]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[WP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[InheritedRunners]
+      ,[InheritedRunScored]
+      ,[QS]
+      ,[GF]
+      ,[FIPAdj]
+      ,[FIPAdjMinus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_pitcher_basic]
+  WHERE LeagueLevel = 1 AND GameType = 'R' AND PA > 100 AND Season = 2023
+"
+
+pitchingstats2023 <- sqlQuery(db_intern_connection, pitchingstatsquery2023)
+
+print(pitchingstats2023)
+```
+
+
+```{r}
+colstoselect <- c("Name", "PlayerID", "Season", "Age", "ERA", "IP", "PA", "BB", "SO", "AVG", "SLG", "OBP", "wRAA", "FIPAdjMinus")
+
+
+pitchingstats2020_selected <- pitchingstats2020[, colstoselect]
+pitchingstats2021_selected <- pitchingstats2021[, colstoselect]
+pitchingstats2022_selected <- pitchingstats2022[, colstoselect]
+pitchingstats2023_selected <- pitchingstats2023[, colstoselect]
+```
+
+```{r}
+pitchingstats2020_selected <- pitchingstats2020_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(SORate = SO/ PA) 
+pitchingstats2021_selected <- pitchingstats2021_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(SORate = SO/ PA)
+pitchingstats2022_selected <- pitchingstats2022_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(SORate = SO/ PA)
+
+pitchingstats2023_selected <- pitchingstats2023_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(SORate = SO/ PA)
+```
+
+```{r}
+numeric_columns <- c("IP", "PA", "ERA", "AVG","OBP", "SLG", "wRAA", "BBRate", "SORate", "FIPAdjMinus")
+
+pitching_stats_2022_weighted <- pitchingstats2022_selected[, numeric_columns] * 5
+pitching_stats_2021_weighted <- pitchingstats2021_selected[, numeric_columns] * 4
+pitching_stats_2020_weighted <- pitchingstats2020_selected[, numeric_columns] * 3
+```
+
+```{r}
+pitching_stats_2020_weighted <- cbind(pitchingstats2020_selected[, setdiff(names(pitchingstats2020_selected), numeric_columns)], pitching_stats_2020_weighted)
+pitching_stats_2021_weighted <- cbind(pitchingstats2021_selected[, setdiff(names(pitchingstats2021_selected), numeric_columns)], pitching_stats_2021_weighted)
+pitching_stats_2022_weighted <- cbind(pitchingstats2022_selected[, setdiff(names(pitchingstats2022_selected), numeric_columns)], pitching_stats_2022_weighted)
+```
+
+
+```{r}
+combined_stats <- left_join(pitching_stats_2020_weighted, pitching_stats_2021_weighted, by = "PlayerID", suffix = c("_2020", "_2021"))
+
+combined_stats <- left_join(combined_stats, pitching_stats_2022_weighted, by = "PlayerID", suffix = c("", "_2022"))
+combined_stats_filter <- combined_stats %>%
+  filter(!is.na(PA_2020) & !is.na(PA_2021) & !is.na(PA))
+combined_stats_unique <- combined_stats_filter %>%
+  distinct(Name, .keep_all = TRUE)
+```
+```{r}
+combined_stats_weighted <- combined_stats_unique %>%
+  mutate(weighted_IP = (IP_2020 + IP_2021 + IP) / 12) %>%
+  mutate(weighted_PA = (PA_2020 + PA_2021 + PA) / 12) %>%
+  mutate(weighted_BBRate = (BBRate_2020 + BBRate_2021 + BBRate) / 12) %>%
+  mutate(weighted_SORate = (SORate_2020 + SORate_2021 + SORate) / 12) %>%
+  mutate(weighted_ERA = (ERA_2020 + ERA_2021 + ERA) / 12) %>%
+  mutate(weighted_AVG = (AVG_2020 + AVG_2021 + AVG) / 12) %>%
+  mutate(weighted_SLG = (SLG_2020 + SLG_2021 + SLG) / 12) %>%
+  mutate(weighted_OBP = (OBP_2020 + OBP_2021 + OBP) / 12) %>%
+  mutate(weighted_FIPAdjMinus = (FIPAdjMinus_2020 + FIPAdjMinus_2021 + FIPAdjMinus) / 12)
+#%>%
+ # mutate(weighted_wRAA = (wRAA_2020 + wRAA_2021 + wRAA) / 12)
+```
+
+```{r}
+weighted_stats <- combined_stats_weighted %>%
+  select(Name, PlayerID,weighted_IP,weighted_PA, weighted_BBRate, weighted_SORate, weighted_ERA, weighted_AVG, weighted_SLG, weighted_OBP,weighted_OBP, weighted_FIPAdjMinus
+      #   ,weighted_wRAA
+         ) %>%
+  filter(weighted_PA >= 150)
+```
+
+```{r}
+merged_stats_w_2023 <- left_join(pitchingstats2023_selected, weighted_stats, by = c("PlayerID", "Name"))
+merged_stats_w_2023 <- merged_stats_w_2023 %>%
+  filter(!is.na(weighted_PA))
+```
+
+```{r}
+age_adjustment <- function(age) {
+  ifelse(is.na(age), 1,
+    ifelse(age <= 0, 1,
+      ifelse(age > 29, 1 / (1 + 0.003 * (age - 29)),
+        1 + 0.015 * (29 - age)
+      )
+    )
+  )
+}
+```
+
+```{r}
+age_adjustment_reciprocal <- function(age) {
+  ifelse(is.na(age), 1,
+    ifelse(age <= 0, 1,
+  ifelse (age > 29, 1 + 0.003 * (age-29),
+    1/(1 + 0.015 * (29-age)
+    )
+  )
+    )
+  )
+}
+```
+
+
+```{r}
+merged_stats_w_2023 <- merged_stats_w_2023 %>%
+  mutate(age_adjustment_factor = age_adjustment(Age),
+         age_reciprocal = age_adjustment_reciprocal(Age)) %>%
+  filter(PA>=150)
+```
+
+```{r}
+age_adj_stats_w_2023 <- merged_stats_w_2023 %>%
+  mutate(proj_AVG = weighted_AVG * age_adjustment_reciprocal(Age)) %>%
+  mutate(proj_OBP = weighted_OBP * age_adjustment_reciprocal(Age)) %>%
+  mutate(proj_SLG = weighted_SLG * age_adjustment_reciprocal(Age)) %>%
+  mutate(proj_BBRate = weighted_BBRate * age_adjustment_reciprocal(Age)) %>%
+  mutate(proj_SORate = weighted_SORate * age_adjustment(Age)) %>%
+  mutate(proj_FIPAdjMinus = weighted_FIPAdjMinus * age_adjustment_reciprocal(Age)) %>%
+  mutate(proj_ERA = weighted_ERA * age_adjustment_reciprocal(Age)) 
+ # mutate(proj_wRAA = weighted_wRAA * age_adjustment_reciprocal(Age))
+```
+
+```{r}
+age_adj_stats_w_2023 <- age_adj_stats_w_2023 %>%
+  mutate(perc_diff_AVG = ((AVG - proj_AVG) / AVG) * 100,
+         perc_diff_OBP = ((OBP - proj_OBP) / OBP) * 100,
+         perc_diff_SLG = ((SLG - proj_SLG) / SLG) * 100,
+         perc_diff_BBRate = ((BBRate - proj_BBRate) / BBRate) * 100,
+         perc_diff_SORate = ((SORate - proj_SORate) / SORate) * 100,
+         perc_diff_ERA = ((ERA - proj_ERA) / ERA) * 100,
+         #perc_diff_wRAA = ((wRAA - proj_wRAA) / wRAA) * 100,
+         perc_diff_FIPAdjMinus = ((FIPAdjMinus - proj_FIPAdjMinus) / FIPAdjMinus) *100)
+```
+
+```{r}
+age_adj_stats_w_2023 <- age_adj_stats_w_2023 %>%
+  mutate(total_perc_diff = perc_diff_AVG + perc_diff_OBP + perc_diff_SLG + 
+                            perc_diff_BBRate + perc_diff_SORate + perc_diff_ERA + perc_diff_FIPAdjMinus)
+```
+
+```{r}
+age_adj_stats_w_2023_unique <- age_adj_stats_w_2023 %>%
+  distinct(Name, .keep_all = TRUE)
+model_performance_2023 <- age_adj_stats_w_2023_unique %>%
+  summarise(sum_perc_diff = sum(total_perc_diff)/nrow(age_adj_stats_w_2023_unique))
+model_performance_2023
+```
+
+```{r}
+# Linear regression models
+model_avg <- lm(AVG ~ proj_AVG, data = age_adj_stats_w_2023_unique)
+model_obp <- lm(OBP ~ proj_OBP, data = age_adj_stats_w_2023_unique)
+model_slg <- lm(SLG ~ proj_SLG, data = age_adj_stats_w_2023_unique)
+
+# Summarize models
+summary(model_avg)
+summary(model_obp)
+summary(model_slg)
+
+# Scatter plot with linear regression line for AVG
+ggplot(age_adj_stats_w_2023_unique, aes(x = proj_AVG, y = AVG)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected AVG",
+       x = "Projected AVG",
+       y = "Actual AVG") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for OBP
+ggplot(age_adj_stats_w_2023_unique, aes(x = proj_OBP, y = OBP)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected OBP",
+       x = "Projected OBP",
+       y = "Actual OBP") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for SLG
+ggplot(age_adj_stats_w_2023_unique, aes(x = proj_SLG, y = SLG)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected SLG",
+       x = "Projected SLG",
+       y = "Actual SLG") +
+  theme_minimal()
+```
+
+
+
+```{r}
+# Linear regression models
+model_era <- lm(ERA ~ proj_ERA, data = age_adj_stats_w_2023_unique)
+model_fip <- lm(FIPAdjMinus ~ proj_FIPAdjMinus, data = age_adj_stats_w_2023_unique)
+model_so <- lm(SORate ~ proj_SORate, data = age_adj_stats_w_2023_unique)
+
+# Summarize models
+summary(model_era)
+summary(model_fip)
+summary(model_so)
+
+# Scatter plot with linear regression line for ERA
+ggplot(age_adj_stats_w_2023_unique, aes(x = proj_ERA, y = ERA)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected ERA",
+       x = "Projected ERA",
+       y = "Actual ERA") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for FIPAdjMinus
+ggplot(age_adj_stats_w_2023_unique, aes(x = proj_FIPAdjMinus, y = FIPAdjMinus)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected FIPAdjMinus",
+       x = "Projected FIPAdjMinus",
+       y = "Actual FIPAdjMinus") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for SORate
+ggplot(age_adj_stats_w_2023_unique, aes(x = proj_SORate, y = SORate)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected SORate",
+       x = "Projected SORate",
+       y = "Actual SORate") +
+  theme_minimal()
+```
+
+
+
+

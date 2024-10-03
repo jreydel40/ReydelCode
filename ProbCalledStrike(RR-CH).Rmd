@@ -1,0 +1,300 @@
+---
+title: "ProbCalledStrike(RR-CH)"
+output: html_document
+date: "2024-07-24"
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(RODBC)
+library(sqldf)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(glue)
+library(caret)
+library(data.table)
+library(mgcv)
+library(glmnet)
+library(lme4)
+library(tidyverse)
+library(glue)
+library(caTools) #this is for test/train split the dataset
+library(CatEncoders) #this is for label encoding
+library(randomForest) #random forest package
+library(xgboost) #xgboost library
+library(ggThemeAssist)
+library(ggthemes)
+library(ggpubr)
+library(png)
+library(patchwork)
+library(car)
+library(Matrix)
+```
+
+```{r}
+conn2 <- odbcDriverConnect("Driver={SQL Server};Server=OPSDBOAK85.oaklandathletics.com;Database=master;Trusted_Connection=yes;")
+
+
+
+
+
+## ---------------------------------------------------------------
+
+query <- sqlQuery(conn2, "
+SELECT 
+    pe.PitcherId,
+	pe.BatterId,
+	g.UmpHomeId,
+    pe.PitHand,
+    pe.IsStrike,
+	pl.StrikeZoneTop,
+	pl.StrikeZoneBottom,
+	pe.F2,
+    p.x0,
+    p.y0,
+    p.z0,
+    p.vx0,
+    p.vy0,
+    p.vz0,
+    p.ax,
+    p.ay,
+    p.az,
+    p.PitchType,
+    p.StartSpeed,
+    p.SpinRate,
+    p.pz,
+    p.px
+FROM 
+    mlb_stats.dbo.pbp_play_event AS pe
+LEFT JOIN 
+    mlb_stats.dbo.pbp_play_event_pitch AS p
+    ON p.GamePk = pe.GamePk 
+    AND p.PlayId = pe.PlayId
+LEFT JOIN 
+    mlb_stats.dbo.pbp_game AS g
+    ON g.GamePk = pe.GamePk
+LEFT JOIN 
+    mlb_stats.dbo.mlb_player AS pl
+    ON pe.BatterId = pl.PlayerId
+WHERE 
+    pe.IsPitch = 1  
+    AND p.PitchType = 'CH' 
+    AND p.StartSpeed >= 60
+    AND YEAR(g.GameDate) = 2024
+    AND g.GameType = 'R'
+	AND g.LeagueLevel = 1
+	AND pe.IsSwing = 0
+	AND pe.PitHand = 'R'
+	AND pe.BatHand= 'R'
+")
+```
+
+```{r}
+set.seed(1693)
+
+```
+
+```{r}
+#Quadratic formula to solve for platetime
+#How long it takes for the ball to reach the plate from ball release
+quad <- function(a, b, c) 
+{
+  a <- a*.5
+  a <- as.complex(a)
+  answer <- c((-b + sqrt(b^2 - 4 * a * (c-1.41667))) / (2 * a),
+              (-b - sqrt(b^2 - 4 * a * (c-1.41667)))/ (2 * a))
+  if(all(Im(answer) == 0)) answer <- Re(answer)
+  if(answer[1] == answer[2]){
+    ans=answer[1]
+  }else{
+    ans=min(answer[1],answer[2])
+  }
+  return (ans)
+} 
+```
+
+```{r}
+#Running the quadratic formula function
+quad(query[1600,]$ay, query[1600,]$vy0, query[1600,]$y0)
+query$platetime = 0
+for (i in 1:nrow(query_test)){
+  query[i,]$platetime <- quad(query[i,]$ay, query[i,]$vy0, query[i,]$y0)
+}
+
+
+#Deriving the new px and pz 
+plate <- function(a,b,c,t){
+  plate <- (.5*a*(t^2))+(b*t)+(c)
+  return(plate)
+}
+
+#Euclidean distance from the real px and pz with derived px and pz 
+euc <- function(x1,x2,z1,z2){
+  ans <- sqrt((x1-x2)^2+(z1-z2)^2)
+  return(ans)
+}
+
+```
+
+```{r}
+query$pxNew <- 0
+query$pzNew <-0
+query$dist <- 0
+
+#Looping functions to get new features
+for (i in 1:nrow(query)){
+  query[i,]$pxNew <- plate(query[i,]$ax, query[i,]$vx0, query[i,]$x0, query[i,]$platetime)
+  query[i,]$pzNew <- plate(query[i,]$az, query[i,]$vz0, query[i,]$z0, query[i,]$platetime)
+  query[i,]$dist <- euc(query[i,]$px, query[i,]$pxNew, query[i,]$pz, query[i,]$pzNew)
+}
+```
+
+
+```{r}
+query <- na.omit(query) 
+
+#make sure the target variable is a factor for classification
+query$IsStrike <- factor(query$IsStrike)
+
+
+#New columns
+query$IsStrike <- factor(query$IsStrike) # the response variable
+query$pzCenter <- (query$pzNew-(query$StrikeZoneBottom+query$StrikeZoneTop)/2) #the center of the plate, vertically 
+query$accel <- sqrt(query$ax^2 + query$ay^2 + query$az^2) # total acceleration vector
+query$velo <- sqrt(query$vx0^2 + query$vy0^2 + query$vz0^2) #total velocity vector 
+query$release <- sqrt(query$x0^2 + query$y0^2 + query$z0^2) #total starting point vector
+query$px_trans <- abs(query$pxNew) #absolute value of pxNew
+query$ZoneHeight <- query$StrikeZoneTop-query$StrikeZoneBottom #batter zone height 
+query$NewX <- query$pxNew - 0 # centering pxNew so it is the middle of the plate
+```
+
+```{r}
+#query_test <- query[sample(nrow(query), 1000), ]
+split <- sample.split(query$IsStrike, SplitRatio = 0.7)
+
+#train set
+train <- subset(query, split == TRUE)#train set
+test <- subset(query, split == FALSE)#test set
+px_t <- test$px 
+pz_t <- test$pz
+```
+
+```{r}
+logregcb <- glmer(IsStrike ~ 
+                    #ax + #Acceleration in X direction
+                        ay + #Acceleration in the Y direction
+                    #    az + #Acceleration in the Z direction
+                        ax:vx0 + #IT: acceleration and velocity X
+                        az:vz0 + #IT: acceleration and velocity Z
+                        ax:x0 + #IT: acceleration and velocity X
+                        az:z0 + #IT: acceleration and starting point Z
+                    #    x0 + #Starting point in the X direction
+                        y0 + #Starting point in the Y direction
+                    #    z0 + #Starting point in the Z direction
+                        x0:vx0 + #IT: starting point and velocity in the X direction
+                        z0:vz0 + #IT: starting point and velocity in the Z direction
+                        y0:accel + #IT: starting point in the Y direction with total acceleration
+                        z0:velo + #IT: starting point in the Z direction with total velocity vector
+                     #   vx0 + #Velocity in the X direction
+                        vy0 + #Velocity in the Y direction
+                        vz0 + #Velocity in the Z direction
+                   #     vz0:platetime + #IT: velocity in the Z firection with platetime
+                   #     px_trans + #Absolute value of pxNew
+                        release:velo + #IT: total release vector with total velocity vector
+                   #     StrikeZoneBottom + #Bottom of strike zone for specific hitter 
+                  #      NewX:x0 + #IT: CenteredX with starting point in the X direction
+                     #   NewX:ax + #IT: CenteredX with acceleration in the X direction
+                   #     NewX:vx0 + #IT: CenteredX with velocity in the X direction
+                        (1 | F2) + #CatcherID random effect
+                        (1 | PitcherId) + #Pitcher ID random effect
+                        (1 | UmpHomeId) , #Umpire ID random effect
+                     #   StrikeZoneBottom:vz0, #IT: StrikeZoneBottom with velocity in the Z direction
+                        data = train, family = "binomial", , control = glmerControl(optimizer = "bobyqa"))
+summary(logregcb)
+```
+
+```{r}
+save(logregcb, file = "logreg_RR_CH.RData")
+
+
+## ---------------------------------------------------------------
+
+```
+
+```{r}
+logreg_preds1 <- predict(logregcb, test, type = "response", re.form = NA) #StrikePerc
+logreg_preds0 <- 1 - logreg_preds1 #BallPerc
+```
+
+```{r}
+logreg_df <- data.frame(BallPerc = logreg_preds0,
+                        StrikePerc = logreg_preds1,
+                        IsStrike = as.character(test$IsStrike),
+                        px = px_t, pz = pz_t)
+logreg_df$IsStrike <- as.numeric(logreg_df$IsStrike)
+
+#Model performance 
+print(paste("Max Strike%:", max(logreg_df$StrikePerc)))
+
+print(paste("Sum of Strike%:", sum(logreg_df$StrikePerc)))
+
+print(paste("Sum of IsStrike:", sum(logreg_df$IsStrike)))
+
+print(paste("Difference:", abs(sum(logreg_df$StrikePerc)
+                    - sum(logreg_df$IsStrike))))
+```
+```{r}
+#Accuracy Test
+Strike_Perc_Change <- ifelse(logreg_df$StrikePerc > .7, 1, 0) #.7 is an arbitary
+cm <- confusionMatrix(factor(logreg_df$IsStrike), factor(Strike_Perc_Change)); cm
+
+accuracy <- cm$overall["Accuracy"]
+print(accuracy)
+```
+```{r}
+logreg_df %>% arrange(desc(StrikePerc))%>%
+filter(StrikePerc < .75) %>% head(20)
+```
+```{r}
+logreg_df$bucket <- cut(logreg_df$StrikePerc, breaks = seq(0, 1, by = .1), include.lowest = TRUE, labels = FALSE)
+
+```
+
+```{r}
+t = ggplot(logreg_df, aes(x = px_t, y = pz_t, color = as.factor(bucket))) +
+geom_point() + xlim(-2,2) + ylim(0,5) +
+scale_color_brewer(palette="Spectral", name = "StrikePerc Bucket",
+breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+labels = c("0-0.1", "0.1-0.2", "0.2-0.3", "0.3-0.4", "0.4-0.5", 
+"0.5-0.6", "0.6-0.7", "0.7-0.8", "0.8-0.9", "0.9-1.0")) + 
+theme_minimal()  + ggtitle('Model') + # lines after this create the plot
+geom_rect(xmin = -.833, xmax = .833, ymax = 3.47, 
+ymin = 1.6, alpha = 0, color = "black", size = 1) +
+geom_rect(xmin = -1.1083, xmax = 1.1083, 
+ymin = 1.28, ymax = 3.78, alpha = 0, color = "black", linetype = 2, linewidth = .5) +
+geom_rect(xmin = -.5583, xmax = .5583, 
+ymin = 1.9, ymax = 3.1, alpha = 0, color = "black", linetype = 2, linewidth = .5) +
+geom_rect(xmin = -1.667, xmax = 1.667, 
+ymin = .642, ymax = 4.334, alpha = 0, color = "black", linetype = 3, linewidth = .5) +
+coord_fixed() +
+theme(
+panel.grid.major = element_blank(),
+panel.grid.minor = element_blank(),
+panel.background = element_rect(colour = "black")
+) +
+theme(axis.line = element_line(linetype = "solid")) + theme(
+legend.text = element_text(size = 6.5),
+legend.title = element_text(size = 8)
+) + theme(plot.title = element_text(size = 11)) +
+theme(panel.background = element_rect(fill = "gray"),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank()) + ylab(" ") + xlab(" ") +
+theme(panel.background = element_rect(fill = "white")) ; print(t)
+```

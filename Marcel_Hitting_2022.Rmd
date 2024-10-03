@@ -1,0 +1,518 @@
+---
+---
+title: "Marcel_2022_Proj"
+output: html_document
+date: "2024-06-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(xgboost)
+library(flextable)
+library(formattable)
+library(astroFns)
+library(grid)
+library(tibble)
+library(RODBC)
+library(odbc)
+library(sqldf)
+```
+
+```{r}
+db_intern_connection <- odbcDriverConnect(paste('driver={SQL Server};server=OPSDBOAK85',
+                                            Sys.getenv("SERVER"),
+                                            ';database=mlb_stats',
+                                            Sys.getenv("DATABASE"),
+                                            ';trusted_connection=true', sep = ""))
+```
+
+```{r}
+query2019 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2019 AND d.LeagueLevel = 1" 
+mlb_stats_2019 <- sqlQuery(db_intern_connection, query2019)
+print(mlb_stats_2019)
+
+```
+
+
+```{r}
+query2020 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2020 AND d.LeagueLevel = 1"
+mlb_stats_2020 <- sqlQuery(db_intern_connection, query2020)
+print(mlb_stats_2020)
+
+```
+
+```{r}
+query2021 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2021 AND d.LeagueLevel = 1"
+mlb_stats_2021 <- sqlQuery(db_intern_connection, query2021)
+print(mlb_stats_2021)
+
+```
+
+```{r}
+query2022 <- "SELECT [Name]
+      ,[PlayerID]
+      ,[TeamID]
+      ,[TeamName]
+      ,[TeamAbbr]
+      ,[SportCode]
+      ,[Org]
+      ,[LeagueLevel]
+      ,[League]
+      ,[Season]
+      ,[Age]
+      ,[GameType]
+      ,[G]
+      ,[PA]
+      ,[AB]
+      ,[R]
+      ,[H]
+      ,[B1]
+      ,[B2]
+      ,[B3]
+      ,[HR]
+      ,[RBOE]
+      ,[RBI]
+      ,[BB]
+      ,[SO]
+      ,[AVG]
+      ,[OBP]
+      ,[SLG]
+      ,[BABIP]
+      ,[wOBA]
+      ,[wAVG]
+      ,[TB]
+      ,[GDP]
+      ,[HBP]
+      ,[SH]
+      ,[SF]
+      ,[IBB]
+      ,[TP]
+      ,[BIP]
+      ,[GB]
+      ,[LD]
+      ,[FB]
+      ,[PU]
+      ,[IFFB]
+      ,[wRC]
+      ,[wRAA]
+      ,[wRCPlus]
+      ,[FirstGame]
+      ,[LastGame]
+      ,[UpdatedDate]
+  FROM [mlb_stats].[dbo].[stat_batter_basic] d
+  WHERE d.Season = 2022 AND d.LeagueLevel = 1"
+mlb_stats_2022 <- sqlQuery(db_intern_connection, query2022)
+print(mlb_stats_2022)
+
+```
+
+```{r}
+write.csv(mlb_stats_2019, "mlb_stats_2019.csv", row.names = FALSE)
+write.csv(mlb_stats_2020, "mlb_stats_2020.csv", row.names = FALSE)
+write.csv(mlb_stats_2021, "mlb_stats_2021.csv", row.names = FALSE)
+write.csv(mlb_stats_2022, "mlb_stats_2022.csv", row.names = FALSE)
+```
+
+
+```{r}
+mlb_stats_2019_df <- read_csv("mlb_stats_2019.csv")
+mlb_stats_2020_df <- read_csv("mlb_stats_2020.csv")
+mlb_stats_2021_df <- read_csv("mlb_stats_2021.csv")
+mlb_stats_2022_df <- read_csv("mlb_stats_2022.csv")
+
+mlb_stats_2022_df$SLG <- mlb_stats_2022_df$SLG *1.05
+```
+
+
+```{r}
+cols_to_select <- c("Name", "PlayerID", "TeamID", "Season", "Age", "G", "PA", "AB", "H", 
+                    "B1", "B2", "B3", "HR", "BB", "SO", "AVG", "OBP", "SLG", "TB", 
+                    "HBP", "SH", "SF")
+
+mlb_stats_2019_selected <- mlb_stats_2019_df[, cols_to_select]
+mlb_stats_2020_selected <- mlb_stats_2020_df[, cols_to_select]
+mlb_stats_2021_selected <- mlb_stats_2021_df[, cols_to_select]
+
+mlb_stats_2019_selected <- mlb_stats_2019_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+mlb_stats_2020_selected <- mlb_stats_2020_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+mlb_stats_2021_selected <- mlb_stats_2021_selected %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+
+mlb_stats_2022_df <- mlb_stats_2022_df %>%
+  mutate(BBRate = BB/ PA) %>%
+  mutate(KRate = SO/ PA)
+```
+
+```{r}
+numeric_columns <- c("G", "PA", "AB", "H", "B1", "B2", "B3", "HR", "BB", "SO", "AVG", "OBP", "SLG", "TB", "HBP", "SH", "SF", "BBRate", "KRate")
+
+mlb_stats_2019_selected$SLG <- mlb_stats_2019_selected$SLG * 0.95
+
+mlb_stats_2021_weighted <- mlb_stats_2021_selected[, numeric_columns] * 5
+mlb_stats_2020_weighted <- mlb_stats_2020_selected[, numeric_columns] * 4
+mlb_stats_2019_weighted <- mlb_stats_2019_selected[, numeric_columns] * 3
+```
+
+```{r}
+mlb_stats_2019_weighted <- cbind(mlb_stats_2019_selected[, setdiff(names(mlb_stats_2019_selected), numeric_columns)], mlb_stats_2019_weighted)
+mlb_stats_2020_weighted <- cbind(mlb_stats_2020_selected[, setdiff(names(mlb_stats_2020_selected), numeric_columns)], mlb_stats_2020_weighted)
+mlb_stats_2021_weighted <- cbind(mlb_stats_2021_selected[, setdiff(names(mlb_stats_2021_selected), numeric_columns)], mlb_stats_2021_weighted)
+```
+
+
+```{r}
+combined_stats <- left_join(mlb_stats_2019_weighted, mlb_stats_2020_weighted, by = "PlayerID", suffix = c("_2019", "_2020"))
+
+combined_stats <- left_join(combined_stats, mlb_stats_2021_weighted, by = "PlayerID", suffix = c("", "_2021"))
+combined_stats_filter <- combined_stats %>%
+  filter(!is.na(PA_2019) & !is.na(PA_2020) & !is.na(PA))
+combined_stats_unique <- combined_stats_filter %>%
+  distinct(Name, .keep_all = TRUE)
+```
+```{r}
+combined_stats_weighted <- combined_stats_unique %>%
+  mutate(weighted_PA = (PA_2019 + PA_2020 + PA) / 12) %>%
+  mutate(weighted_G = (G_2019 + G_2020 + G) / 12) %>%
+  mutate(weighted_AB = (AB_2019 + AB_2020 + AB) / 12) %>%
+  mutate(weighted_H = (H_2019 + H_2020 + H) / 12) %>%
+  mutate(weighted_B1 = (B1_2019 + B1_2020 + B1) / 12) %>%
+  mutate(weighted_B2 = (B2_2019 + B2_2020 + B2) / 12) %>%
+  mutate(weighted_B3 = (B3_2019 + B3_2020 + B3) / 12) %>%
+  mutate(weighted_HR = (HR_2019 + HR_2020 + HR) / 12) %>%
+  mutate(weighted_BB = (BB_2019 + BB_2020 + BB) / 12) %>%
+  mutate(weighted_SO = (SO_2019 + SO_2020 + SO) / 12) %>%
+  mutate(weighted_AVG = (AVG_2019 + AVG_2020 + AVG) / 12) %>%
+  mutate(weighted_OBP = (OBP_2019 + OBP_2020 + OBP) / 12) %>%
+  mutate(weighted_SLG = (SLG_2019 + SLG_2020 + SLG) / 12) %>%
+  mutate(weighted_TB = (TB_2019 + TB_2020 + TB) / 12) %>%
+  mutate(weighted_HBP = (HBP_2019 + HBP_2020 + HBP) / 12) %>%
+  mutate(weighted_SH = (SH_2019 + SH_2020 + SH) / 12) %>%
+  mutate(weighted_SF = (SF_2019 + SF_2020 + SF) / 12) %>%
+  mutate(weighted_BBRate = (BBRate_2019 + BBRate_2020 + BBRate) / 12) %>%
+  mutate(weighted_KRate = (KRate_2019 + KRate_2020 + KRate) / 12) 
+```
+
+```{r}
+weighted_stats <- combined_stats_weighted %>%
+  select(Name, PlayerID, weighted_PA, weighted_G, weighted_AB, 
+         weighted_H, weighted_B1, weighted_B2, weighted_B3, 
+         weighted_HR, weighted_BB, weighted_SO, 
+         weighted_AVG, weighted_OBP, weighted_SLG, 
+         weighted_TB, weighted_HBP, weighted_SH, weighted_SF, weighted_BBRate, weighted_KRate) %>%
+  filter(weighted_PA >= 400)
+```
+
+```{r}
+merged_stats_w_2022 <- left_join(mlb_stats_2022_df, weighted_stats, by = c("PlayerID", "Name"))
+merged_stats_w_2022 <- merged_stats_w_2022 %>%
+  filter(!is.na(weighted_PA))
+```
+
+```{r}
+age_adjustment <- function(age) {
+  ifelse(is.na(age), 1,
+    ifelse(age <= 0, 1,
+      ifelse(age > 29, 1 / (1 + 0.01 * (age - 29)),
+        1 + 0.003 * (29 - age)
+      )
+    )
+  )
+}
+```
+
+```{r}
+merged_stats_w_2022 <- merged_stats_w_2022 %>%
+  mutate(age_adjustment_factor = age_adjustment(Age)) %>%
+  filter(PA>=400)
+```
+
+```{r}
+age_adj_stats_w_2022 <- merged_stats_w_2022 %>%
+  mutate(proj_AVG = weighted_AVG * age_adjustment(Age)) %>%
+  mutate(proj_OBP = weighted_OBP * age_adjustment(Age)) %>%
+  mutate(proj_SLG = weighted_SLG * age_adjustment(Age)) %>%
+  mutate(proj_HR = weighted_HR * age_adjustment(Age)) %>%
+  mutate(proj_BBRate = weighted_BBRate * age_adjustment(Age)) %>%
+  mutate(proj_KRate = weighted_KRate * (2-age_adjustment(Age)))
+
+age_adj_stats_w_2022 <- age_adj_stats_w_2022 %>%
+  mutate(perc_diff_AVG = ((AVG - proj_AVG) / AVG) * 100,
+         perc_diff_OBP = ((OBP - proj_OBP) / OBP) * 100,
+         perc_diff_SLG = ((SLG - proj_SLG) / SLG) * 100,
+         perc_diff_HR = ((HR - proj_HR) / HR) * 100,
+         perc_diff_BBRate = ((BBRate - proj_BBRate) / BBRate) * 100,
+         perc_diff_KRate = ((KRate - proj_KRate) / KRate) * 100)
+
+```
+
+```{r}
+selected_stats <- age_adj_stats_w_2022 %>%
+  select(Name, Age, PA, AVG, proj_AVG, perc_diff_AVG, OBP, proj_OBP, perc_diff_OBP, SLG, proj_SLG, perc_diff_SLG, HR, proj_HR, perc_diff_HR, BBRate,  proj_BBRate, perc_diff_BBRate, KRate,  proj_KRate, perc_diff_KRate)
+print(selected_stats)
+```
+
+```{r}
+age_adj_stats_w_2022 <- age_adj_stats_w_2022 %>%
+  mutate(total_perc_diff = perc_diff_AVG + perc_diff_OBP + perc_diff_SLG + 
+                            perc_diff_BBRate + perc_diff_KRate)
+selected_stats_2022 <- age_adj_stats_w_2022 %>%
+  select(Name, Age, PA, AVG, proj_AVG, perc_diff_AVG, OBP, proj_OBP, perc_diff_OBP, 
+         SLG, proj_SLG, perc_diff_SLG, HR, proj_HR, perc_diff_HR, BBRate, proj_BBRate, 
+         perc_diff_BBRate, KRate, proj_KRate, perc_diff_KRate, total_perc_diff)
+
+print(selected_stats_2022)
+
+model_performance_2022 <- selected_stats_2022 %>%
+  summarise(sum_perc_diff = sum(total_perc_diff)/nrow(selected_stats_2022))
+model_performance_2022
+```
+
+```{r}
+# Scatter plot for AVG
+ggplot(selected_stats, aes(x = AVG, y = proj_AVG)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Actual vs Projected AVG",
+       x = "Actual AVG",
+       y = "Projected AVG") +
+  theme_minimal()
+
+# Scatter plot for OBP
+ggplot(selected_stats, aes(x = OBP, y = proj_OBP)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Actual vs Projected OBP",
+       x = "Actual OBP",
+       y = "Projected OBP") +
+  theme_minimal()
+
+# Scatter plot for SLG
+ggplot(selected_stats, aes(x = SLG, y = proj_SLG)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Actual vs Projected SLG",
+       x = "Actual SLG",
+       y = "Projected SLG") +
+  theme_minimal()
+
+```
+
+
+
+
+
+```{r}
+# Linear regression models
+model_avg <- lm(AVG ~ proj_AVG, data = selected_stats)
+model_obp <- lm(OBP ~ proj_OBP, data = selected_stats)
+model_slg <- lm(SLG ~ proj_SLG, data = selected_stats)
+
+# Summarize models
+summary(model_avg)
+summary(model_obp)
+summary(model_slg)
+
+# Scatter plot with linear regression line for AVG
+ggplot(selected_stats, aes(x = proj_AVG, y = AVG)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected AVG",
+       x = "Projected AVG",
+       y = "Actual AVG") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for OBP
+ggplot(selected_stats, aes(x = proj_OBP, y = OBP)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected OBP",
+       x = "Projected OBP",
+       y = "Actual OBP") +
+  theme_minimal()
+
+# Scatter plot with linear regression line for SLG
+ggplot(selected_stats, aes(x = proj_SLG, y = SLG)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(title = "Actual vs Projected SLG",
+       x = "Projected SLG",
+       y = "Actual SLG") +
+  theme_minimal()
+
+
+
+```
+

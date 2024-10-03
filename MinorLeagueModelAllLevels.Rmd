@@ -1,0 +1,1465 @@
+---
+title: "MinorLeagueModel"
+output: html_document
+date: "2024-08-02"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+## Load data/packages
+
+library(tidyverse)
+library(baseballr)
+library(plyr)
+library(dplyr)
+library(remotes)
+library(expss)
+library(metR)
+library(mgcv)
+library(gridExtra)
+library(ggimage)
+library(xgboost)
+library(flextable)
+library(formattable)
+library(astroFns)
+library(grid)
+library(tibble)
+library(RODBC)
+library(odbc)
+library(sqldf)
+library(car)
+```
+
+```{r}
+db_intern_connection <- odbcDriverConnect(paste('driver={SQL Server};server=OPSDBOAK85',
+                                            Sys.getenv("SERVER"),
+                                            ';database=mlb_stats',
+                                            Sys.getenv("DATABASE"),
+                                            ';trusted_connection=true', sep = ""))
+```
+
+
+```{r}
+querysinglea <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] < 25 
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 5
+
+" 
+singleastats <- sqlQuery(db_intern_connection, querysinglea)
+print(singleastats)
+```
+
+```{r}
+queryhigha <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] < 26 
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 4
+
+" 
+highastats <- sqlQuery(db_intern_connection, queryhigha)
+print(highastats)
+```
+
+
+```{r}
+querydoublea <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] < 27 
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 3
+
+" 
+doubleastats <- sqlQuery(db_intern_connection, querydoublea)
+print(doubleastats)
+```
+
+```{r}
+querytriplea <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] < 28 
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 2
+" 
+tripleastats <- sqlQuery(db_intern_connection, querytriplea)
+print(tripleastats)
+```
+
+```{r}
+queryage25 <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] = 25 
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 1 
+    AND b.[PA] > 100
+    AND b.[wRCPlus] > 50
+    
+" 
+age25stats <- sqlQuery(db_intern_connection, queryage25)
+print(age25stats)
+```
+
+
+```{r}
+queryage26 <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] = 26 
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 1 
+    AND b.[PA] > 100
+    AND b.[wRCPlus] > 50
+    
+"
+age26stats <- sqlQuery(db_intern_connection, queryage26)
+print(age26stats)
+```
+
+```{r}
+queryage27 <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] = 27
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 1 
+    AND b.[PA] > 100
+    AND b.[wRCPlus] > 50
+    
+" 
+age27stats <- sqlQuery(db_intern_connection, queryage27)
+print(age27stats)
+```
+
+```{r}
+queryage28 <- "SELECT 
+    a.[Name],
+    a.[PlayerID],
+    a.[Season],
+    a.[League],
+    a.[LeagueLevel],
+    a.[TeamID],
+    a.[TeamName],
+    a.[TeamAbbr],
+    a.[SportCode],
+    a.[Org],
+    a.[Age],
+    a.[GameType],
+    a.[Age_Grade],
+    a.[PA] AS PA_Norm,
+    a.[AB] AS AB_Norm,
+    a.[AVG_Norm],
+    a.[OBP_Norm],
+    a.[wAVG_Norm],
+    a.[ISO_Norm],
+    a.[BABIP_Norm],
+    a.[BB_Norm],
+    a.[SO_Norm],
+    a.[GB_Norm],
+    a.[LD_Norm],
+    a.[FB_Norm],
+    a.[PU_Norm],
+    b.[G],
+    b.[PA] AS PA_Basic,
+    b.[AB] AS AB_Basic,
+    b.[R],
+    b.[H],
+    b.[B1],
+    b.[B2],
+    b.[B3],
+    b.[HR],
+    b.[RBOE],
+    b.[RBI],
+    b.[BB],
+    b.[SO],
+    b.[AVG],
+    b.[OBP],
+    b.[SLG],
+    b.[BABIP],
+    b.[wOBA],
+    b.[wAVG] AS wAVG_Basic,
+    b.[TB],
+    b.[GDP],
+    b.[HBP],
+    b.[SH],
+    b.[SF],
+    b.[IBB],
+    b.[TP],
+    b.[BIP],
+    b.[GB] AS GB_Basic,
+    b.[LD] AS LD_Basic,
+    b.[FB] AS FB_Basic,
+    b.[PU] AS PU_Basic,
+    b.[IFFB],
+    b.[wRC],
+    b.[wRAA],
+    b.[wRCPlus],
+    c.[PA] AS PA_BIP,
+    c.[wOBAAct],
+    c.[wOBAEstRF],
+    c.[wOBADiff],
+    c.[RunDiff],
+    c.[ExitVelo95],
+    c.[ExitVeloGrade],
+    c.[ExitVelo95AgePercentile],
+    c.[HardHitLaunchAngle],
+    d.[ContactPCT],
+    d.[ZoneContactPCT],
+    d.[OZoneContactPCT],
+    d.[SwingPCT],
+    d.[ZoneSwingPCT],
+    d.[OZoneSwingPCT],
+    d.[SwingStrikePCT],
+    d.[SwingStrikePerSwing],
+    d.[ZonePCT],
+    d.[FirstZonePCT],
+    d.[FBHeartWhiffPCT],
+    d.[SDAA1000],
+    d.[SDAA1000Heart],
+    d.[SDAA1000Shadow],
+    d.[SDAA1000Chase],
+    d.[PredLgSwingPCT]
+FROM 
+    [mlb_stats].[dbo].[stat_batter_norm] a
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_basic] b
+    ON a.[PlayerID] = b.[PlayerID]
+    AND a.[Season] = b.[Season]
+    AND a.[LeagueLevel] = b.[LeagueLevel]
+    AND a.[GameType] = b.[GameType]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_bip_contact] c
+    ON a.[PlayerID] = c.[PlayerID]
+    AND a.[Season] = c.[Season]
+    AND a.[LeagueLevel] = c.[LeagueLevel]
+JOIN 
+    [mlb_stats].[dbo].[stat_batter_discipline] d
+    ON a.[PlayerID] = d.[PlayerID]
+    AND a.[Season] = d.[Season]
+    AND a.[LeagueLevel] = d.[LeagueLevel]
+    AND a.[GameType] = d.[GameType]
+WHERE 
+    a.[Age] = 28 
+    AND a.[GameType] = 'R' 
+    AND a.[LeagueLevel] = 1 
+    AND b.[PA] > 100
+    AND b.[wRCPlus] > 50
+    
+" 
+age28stats <- sqlQuery(db_intern_connection, queryage28)
+print(age28stats)
+```
+
+```{r}
+singleastats <- singleastats %>%
+  mutate(ISO = SLG-AVG) %>%
+  mutate(BBRate = BB/ PA_Basic) %>%
+  mutate(KRate = SO/ PA_Basic) %>%
+  mutate(OPS = OBP + SLG)
+
+highastats <- highastats %>%
+  mutate(ISO = SLG-AVG) %>%
+  mutate(BBRate = BB/ PA_Basic) %>%
+  mutate(KRate = SO/ PA_Basic)  %>%
+  mutate(OPS = OBP + SLG)
+
+doubleastats <- doubleastats %>%
+  mutate(ISO = SLG-AVG) %>%
+  mutate(BBRate = BB/ PA_Basic) %>%
+  mutate(KRate = SO/ PA_Basic)  %>%
+  mutate(OPS = OBP + SLG)
+
+tripleastats <- tripleastats %>%
+  mutate(ISO = SLG-AVG) %>%
+  mutate(BBRate = BB/ PA_Basic) %>%
+  mutate(KRate = SO/ PA_Basic)  %>%
+  mutate(OPS = OBP + SLG)
+
+age25stats <- age25stats %>%
+  mutate(ISO = SLG-AVG)  %>%
+  mutate(OPS = OBP + SLG)
+age26stats <- age26stats %>%
+  mutate(ISO = SLG-AVG)  %>%
+  mutate(OPS = OBP + SLG)
+age27stats <- age27stats %>%
+  mutate(ISO = SLG-AVG)  %>%
+  mutate(OPS = OBP + SLG)
+age28stats <- age28stats %>%
+  mutate(ISO = SLG-AVG)  %>%
+  mutate(OPS = OBP + SLG)
+```
+
+```{r}
+
+
+age_select_cols <- c("PlayerID", "Season", "wRCPlus", "wRAA")
+
+age25stats_selected <- age25stats[,age_select_cols]
+age26stats_selected <- age26stats[,age_select_cols]
+age27stats_selected <- age27stats[,age_select_cols]
+age28stats_selected <- age28stats[,age_select_cols]
+# Load the dplyr package
+library(dplyr)
+
+
+# Rename columns in age25stats_selected
+age25stats_selected <- age25stats_selected %>%
+  dplyr::rename(age25Season = Season) %>%
+  dplyr::rename(age25wRCPlus = wRCPlus) %>%
+  dplyr::rename(age25wRAA = wRAA)
+
+# Rename columns in age26stats_selected
+age26stats_selected <- age26stats_selected %>%
+  dplyr::rename(age26Season = Season)  %>%
+  dplyr::rename(age26wRCPlus = wRCPlus) %>%
+  dplyr::rename(age26wRAA = wRAA)
+
+# Rename columns in age27stats_selected
+age27stats_selected <- age27stats_selected %>%
+  dplyr::rename(age27Season = Season) %>%
+  dplyr::rename(age27wRCPlus = wRCPlus) %>%
+  dplyr::rename(age27wRAA = wRAA)
+
+# Rename columns in age28stats_selected
+age28stats_selected <- age28stats_selected %>%
+  dplyr::rename(age28Season = Season) %>%
+  dplyr::rename(age28wRCPlus = wRCPlus) %>%
+  dplyr::rename(age28wRAA = wRAA)
+```
+
+```{r}
+cols_to_select <- c("Name", "PlayerID", "Season", "Age_Grade", "Age", "PA_Basic", "ISO", "BBRate", "KRate", "BABIP", "wAVG_Basic", "AVG", "SLG", "OBP", "OPS", "AVG_Norm", "OBP_Norm", "ISO_Norm", "BABIP_Norm", "BB_Norm", "SO_Norm", "wRCPlus", "ExitVelo95", "HardHitLaunchAngle", "SDAA1000", "FBHeartWhiffPCT", "SDAA1000Chase", "ZoneSwingPCT", "OZoneSwingPCT", "SDAA1000Heart")
+
+singleastats_selected <- singleastats[, cols_to_select]
+highastats_selected <- highastats[, cols_to_select]
+doubleastats_selected <- doubleastats[, cols_to_select]
+tripleastats_selected <- tripleastats[, cols_to_select]
+```
+
+```{r}
+singlea_averages <- singleastats_selected %>%
+  dplyr::group_by(Name, PlayerID) %>%
+  dplyr::summarize(across(c(Age_Grade, Age, PA_Basic, ISO, BBRate, KRate, BABIP, wAVG_Basic, AVG, SLG, OBP, OPS, AVG_Norm, OBP_Norm, ISO_Norm, BABIP_Norm, BB_Norm, SO_Norm, wRCPlus, ExitVelo95, HardHitLaunchAngle, SDAA1000, FBHeartWhiffPCT, SDAA1000Chase, ZoneSwingPCT, OZoneSwingPCT, SDAA1000Heart), mean, na.rm = TRUE))
+
+higha_averages <- highastats_selected %>%
+  dplyr::group_by(Name, PlayerID) %>%
+  dplyr::summarize(across(c(Age_Grade, Age, PA_Basic, ISO, BBRate, KRate, BABIP, wAVG_Basic, AVG, SLG, OBP, OPS, AVG_Norm, OBP_Norm, ISO_Norm, BABIP_Norm, BB_Norm, SO_Norm, wRCPlus, ExitVelo95, HardHitLaunchAngle, SDAA1000, FBHeartWhiffPCT, SDAA1000Chase, ZoneSwingPCT, OZoneSwingPCT, SDAA1000Heart), mean, na.rm = TRUE))
+
+doublea_averages <- doubleastats_selected %>%
+  dplyr::group_by(Name, PlayerID) %>%
+  dplyr::summarize(across(c(Age_Grade, Age, PA_Basic, ISO, BBRate, KRate, BABIP, wAVG_Basic, AVG, SLG, OBP, OPS, AVG_Norm, OBP_Norm, ISO_Norm, BABIP_Norm, BB_Norm, SO_Norm, wRCPlus, ExitVelo95, HardHitLaunchAngle, SDAA1000, FBHeartWhiffPCT, SDAA1000Chase, ZoneSwingPCT, OZoneSwingPCT, SDAA1000Heart), mean, na.rm = TRUE))
+
+triplea_averages <- tripleastats_selected %>%
+  dplyr::group_by(Name, PlayerID) %>%
+  dplyr::summarize(across(c(Age_Grade, Age, PA_Basic, ISO, BBRate, KRate, BABIP, wAVG_Basic, AVG, SLG, OBP, OPS, AVG_Norm, OBP_Norm, ISO_Norm, BABIP_Norm, BB_Norm, SO_Norm, wRCPlus, ExitVelo95, HardHitLaunchAngle, SDAA1000, FBHeartWhiffPCT, SDAA1000Chase, ZoneSwingPCT, OZoneSwingPCT, SDAA1000Heart), mean, na.rm = TRUE))
+
+```
+
+```{r}
+combinedwRCPlus_stats <- age25stats_selected %>%
+  left_join(age26stats_selected, by = "PlayerID") %>%
+  left_join(age27stats_selected, by = "PlayerID") %>%
+  left_join(age28stats_selected, by = "PlayerID")
+
+# View the combined data frame
+print(combinedwRCPlus_stats) 
+```
+
+```{r}
+numeric_columns <- c("Age_Grade", "Age", "PA_Basic", "ISO", "BBRate", "KRate", "BABIP", "wAVG_Basic", "AVG", "SLG", "OBP", "OPS", "AVG_Norm", "OBP_Norm", "ISO_Norm", "BABIP_Norm", "BB_Norm", "SO_Norm", "wRCPlus", "ExitVelo95", "HardHitLaunchAngle", "SDAA1000", "FBHeartWhiffPCT", "SDAA1000Chase", "ZoneSwingPCT", "OZoneSwingPCT", "SDAA1000Heart")
+singlea_weighted <- singlea_averages[,numeric_columns] * 1
+higha_weighted <- higha_averages[,numeric_columns] * 1
+doublea_weighted <- doublea_averages[,numeric_columns] * 1
+triplea_weighted <- triplea_averages[,numeric_columns] * 1
+
+singlea_weighted <- cbind(singlea_averages[, setdiff(names(singlea_averages), numeric_columns)], singlea_weighted)
+higha_weighted <- cbind(higha_averages[, setdiff(names(higha_averages), numeric_columns)], higha_weighted)
+doublea_weighted <- cbind(doublea_averages[, setdiff(names(doublea_averages), numeric_columns)], doublea_weighted)
+triplea_weighted <- cbind(triplea_averages[, setdiff(names(triplea_averages), numeric_columns)], triplea_weighted)
+
+add_suffix <- function(df, suffix) {
+  names(df)[-1:-2] <- paste0(names(df)[-1:-2], suffix)
+  return(df)
+}
+
+singlea_weighted <- add_suffix(singlea_weighted, "_singleA")
+higha_weighted <- add_suffix(higha_weighted, "_highA")
+doublea_weighted <- add_suffix(doublea_weighted, "_doubleA")
+triplea_weighted <- add_suffix(triplea_weighted, "_tripleA")
+
+
+```
+
+
+```{r}
+combined_weighted <- singlea_weighted %>%
+  left_join(higha_weighted, by = c("Name", "PlayerID")) %>%
+  left_join(doublea_weighted, by = c("Name", "PlayerID"))%>%
+  left_join(triplea_weighted, by = c("Name", "PlayerID"))
+```
+
+```{r}
+# Load necessary library
+library(dplyr)
+
+# Define the function to calculate total weight
+calculate_total_weight <- function(df) {
+  total_weight <- rowSums(cbind(
+    ifelse(!is.na(df$PA_Basic_singleA), 1, 0),
+    ifelse(!is.na(df$PA_Basic_highA), 1, 0),
+    ifelse(!is.na(df$PA_Basic_doubleA), 1, 0),
+    ifelse(!is.na(df$PA_Basic_tripleA), 1, 0)
+  ), na.rm = TRUE)
+  
+  return(total_weight)
+}
+
+combined_weighted$total_weight <- calculate_total_weight(combined_weighted)
+
+# View the result
+print(combined_weighted)
+```
+
+```{r}
+cols <- c("PlayerID", "total_weight")
+
+total_weight_df <- combined_weighted[,cols]
+```
+
+
+```{r}
+library(dplyr)
+
+total_weighted_sums <- combined_weighted %>%
+  mutate(total_Age_Grade = Age_Grade_singleA + Age_Grade_doubleA + Age_Grade_highA + Age_Grade_tripleA,
+         total_Age = Age_singleA + Age_doubleA + Age_highA + Age_tripleA,
+         total_PA_Basic = PA_Basic_singleA + PA_Basic_doubleA + PA_Basic_highA + PA_Basic_tripleA,
+         total_ISO = ISO_singleA + ISO_doubleA + ISO_highA + ISO_tripleA,
+         total_BBRate = BBRate_singleA + BBRate_doubleA + BBRate_highA + BBRate_tripleA,
+         total_KRate = KRate_singleA + KRate_doubleA + KRate_highA + KRate_tripleA,
+         total_BABIP = BABIP_singleA + BABIP_doubleA + BABIP_highA + BABIP_tripleA,
+         total_wAVG_Basic = wAVG_Basic_singleA + wAVG_Basic_doubleA + wAVG_Basic_highA + wAVG_Basic_tripleA,
+         total_AVG = AVG_singleA + AVG_doubleA + AVG_highA + AVG_tripleA,
+         total_SLG = SLG_singleA + SLG_doubleA + SLG_highA + SLG_tripleA,
+         total_OBP = OBP_singleA + OBP_doubleA + OBP_highA + OBP_tripleA,
+         total_OPS = OPS_singleA + OPS_doubleA + OPS_highA + OPS_tripleA,
+         total_AVG_Norm = AVG_Norm_singleA + AVG_Norm_doubleA + AVG_Norm_highA + AVG_Norm_tripleA,
+         total_OBP_Norm = OBP_Norm_singleA + OBP_Norm_doubleA + OBP_Norm_highA + OBP_Norm_tripleA,
+         total_ISO_Norm = ISO_Norm_singleA + ISO_Norm_doubleA + ISO_Norm_highA + ISO_Norm_tripleA,
+         total_BABIP_Norm = BABIP_Norm_singleA + BABIP_Norm_doubleA + BABIP_Norm_highA + BABIP_Norm_tripleA,
+         total_BB_Norm = BB_Norm_singleA + BB_Norm_doubleA + BB_Norm_highA + BB_Norm_tripleA,
+         total_SO_Norm = SO_Norm_singleA + SO_Norm_doubleA + SO_Norm_highA + SO_Norm_tripleA,
+         total_wRCPlus = wRCPlus_singleA + wRCPlus_doubleA + wRCPlus_highA + wRCPlus_tripleA,
+         total_ExitVelo95 = ExitVelo95_singleA + ExitVelo95_doubleA + ExitVelo95_highA + ExitVelo95_tripleA,
+         total_HardHitLaunchAngle = HardHitLaunchAngle_singleA + HardHitLaunchAngle_doubleA + HardHitLaunchAngle_highA + HardHitLaunchAngle_tripleA,
+         total_SDAA1000 = SDAA1000_singleA + SDAA1000_doubleA + SDAA1000_highA + SDAA1000_tripleA, 
+         total_OZoneSwingPCT = OZoneSwingPCT_singleA + OZoneSwingPCT_doubleA + OZoneSwingPCT_highA + OZoneSwingPCT_tripleA,
+         total_FBHeartWhiffPCT = FBHeartWhiffPCT_singleA + FBHeartWhiffPCT_doubleA + FBHeartWhiffPCT_highA + FBHeartWhiffPCT_tripleA
+         )
+
+# View the total weighted sums
+print(head(total_weighted_sums))
+
+```
+
+
+```{r}
+total_weighted_avg <- total_weighted_sums %>%
+  left_join(total_weight_df, by = c("PlayerID"))
+```
+
+
+
+```{r}
+# Divide each numerical column by the total weight column
+final_weighted_avg <- total_weighted_avg %>%
+  mutate(total_Age_Grade_avg = total_Age_Grade / total_weight.y) %>%
+  mutate(total_ISO_avg = total_ISO / total_weight.y) %>%
+  mutate(total_BBRate_avg = total_BBRate / total_weight.y) %>%
+  mutate(total_KRate_avg = total_KRate / total_weight.y) %>%
+  mutate(total_BABIP_avg = total_BABIP / total_weight.y) %>%
+  mutate(total_wAVG_Basic_avg = total_wAVG_Basic / total_weight.y) %>%
+  mutate(total_AVG_avg = total_AVG / total_weight.y) %>%
+  mutate(total_OBP_avg = total_OBP / total_weight.y) %>%
+  mutate(total_SLG_avg = total_SLG / total_weight.y) %>%
+  mutate(total_OPS_avg = total_OPS / total_weight.y) %>%
+  mutate(total_AVG_Norm_avg = total_AVG_Norm / total_weight.y) %>%
+  mutate(total_OBP_Norm_avg = total_OBP_Norm / total_weight.y) %>%
+  mutate(total_BABIP_Norm_avg = total_BABIP_Norm / total_weight.y) %>%
+  mutate(total_ISO_Norm_avg = total_ISO_Norm / total_weight.y) %>%
+  mutate(total_BB_Norm_avg = total_BB_Norm / total_weight.y) %>%
+  mutate(total_SO_Norm_avg = total_SO_Norm / total_weight.y) %>%
+  mutate(total_wRCPlus_avg = total_wRCPlus / total_weight.y) %>%
+  mutate(total_ExitVelo95_avg = total_ExitVelo95 / total_weight.y) %>%
+  mutate(total_HardHitLaunchAngle_avg = total_HardHitLaunchAngle / total_weight.y) %>%
+  mutate(total_wRCPlus_avg = total_wRCPlus / total_weight.y) %>%
+  mutate(total_SDAA1000_avg = total_SDAA1000 / total_weight.y) %>%
+  mutate(total_OZoneSwingPCT_avg = total_OZoneSwingPCT / total_weight.y) %>%
+  mutate(total_FBHeartWhiffPCT_avg = total_FBHeartWhiffPCT / total_weight.y)
+  
+# View the final weighted averages
+print(final_weighted_avg)
+
+```
+
+
+
+```{r}
+add_suffix <- function(df, suffix) {
+  names(df)[-1:-2] <- paste0(names(df)[-1:-2], suffix)
+  return(df)
+}
+
+singlea_averages <- add_suffix(singlea_averages, "_singleA")
+higha_averages <- add_suffix(higha_averages, "_highA")
+doublea_averages <- add_suffix(doublea_averages, "_doubleA")
+triplea_averages <- add_suffix(triplea_averages, "_tripleA")
+
+# Merge the datasets
+combined_averages <- singlea_averages %>%
+  left_join(higha_averages, by = c("Name", "PlayerID")) %>%
+  left_join(doublea_averages, by = c("Name", "PlayerID"))%>%
+  left_join(triplea_averages, by = c("Name", "PlayerID"))
+
+# View the result
+print(combined_averages)
+```
+
+
+
+
+
+
+```{r}
+# Load the necessary library
+library(dplyr)
+
+# Perform the join
+final_combined_stats <- final_weighted_avg %>%
+  left_join(combinedwRCPlus_stats, by = "PlayerID")
+
+# View the final combined data frame
+print(final_combined_stats)
+
+```
+
+
+
+
+```{r}
+all_level_minors <- combined_weighted %>%
+  filter(!is.na(PA_Basic_singleA) & !is.na(PA_Basic_doubleA) & !is.na(PA_Basic_highA) & !is.na(PA_Basic_tripleA)) %>%
+  filter(!is.na(SDAA1000_singleA)& !is.na(SDAA1000_doubleA) & !is.na(SDAA1000_highA) & !is.na(SDAA1000_tripleA)) %>%
+  select(PlayerID)
+
+all_level_minors_w_MLBValue <- all_level_minors%>%
+  left_join(final_weighted_avg, by = c("Name", "PlayerID")) %>%
+  left_join(combinedwRCPlus_stats, by = "PlayerID")
+
+
+```
+
+```{r}
+all_level_minors_w_MLBValue25 <- all_level_minors_w_MLBValue %>%
+  filter(!is.na(age25wRCPlus)) %>%
+  filter(!is.na(total_ExitVelo95_avg)) %>%
+  distinct(age25wRCPlus, .keep_all = TRUE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+# Example: Higher-order interactions (up to three-way) 
+age25model_test_higher_order <- lm(age25wRCPlus ~ (total_Age_Grade_avg  + total_SDAA1000_avg + total_HardHitLaunchAngle_avg  + total_BABIP_avg + total_ExitVelo95_avg)^2, data = all_level_minors_w_MLBValue25)
+summary(age25model_test_higher_order)
+
+stepwise_model_higher_order <- step(age25model_test_higher_order, 
+                       direction = "both",  # Options are "both", "backward", "forward"
+                       trace = 0)           # trace = 0 suppresses output for each step
+
+# Summary of the final model
+summary(stepwise_model_higher_order)
+```
+
+
+```{r}
+# Start with the main effects
+model1 <- lm(age25wRCPlus ~ total_Age_Grade_avg  + total_ISO_avg + total_BBRate_avg + total_KRate_avg + total_BABIP_avg + total_wAVG_Basic_avg + total_AVG_avg  +  total_wRCPlus_avg + total_ExitVelo95_avg + total_HardHitLaunchAngle_avg + total_SDAA1000_avg + total_FBHeartWhiffPCT_avg +total_OZoneSwingPCT_avg, 
+             data = all_level_minors_w_MLBValue25)
+
+
+stepwise_model25 <- step(model1, 
+                       direction = "both",  # Options are "both", "backward", "forward"
+                       trace = 0)           # trace = 0 suppresses output for each step
+
+# Summary of the final model
+summary(stepwise_model25)
+
+vif(stepwise_model25)
+
+model2 <- lm(age25wRCPlus ~ (total_Age_Grade_avg + total_BBRate_avg + total_KRate_avg  + total_wAVG_Basic_avg + total_AVG_avg  +  total_wRCPlus_avg + total_ExitVelo95_avg + total_HardHitLaunchAngle_avg + total_SDAA1000_avg + total_FBHeartWhiffPCT_avg + total_OZoneSwingPCT_avg)^2, 
+             data = all_level_minors_w_MLBValue25)
+
+
+stepwise_model252 <- step(model2, 
+                       direction = "both",  # Options are "both", "backward", "forward"
+                       trace = 0)           # trace = 0 suppresses output for each step
+
+# Summary of the final model
+summary(stepwise_model252)
+
+vif(stepwise_model252)
+```
+
+```{r}
+# Generate predicted values based on the final model
+predicted_values <- predict(stepwise_model252)
+
+all_level_minors_w_MLBValue25$predicted_age25wRCPlus <- predicted_values
+
+all_level_minors_w_MLBValue25$diff_age25wRCPlus <- all_level_minors_w_MLBValue25$predicted_age25wRCPlus - all_level_minors_w_MLBValue25$age25wRCPlus
+
+
+all_level_minors_w_MLBValue25$percent_diff_age25wRCPlus <- ((all_level_minors_w_MLBValue25$predicted_age25wRCPlus - all_level_minors_w_MLBValue25$age25wRCPlus) / 
+                                                            all_level_minors_w_MLBValue25$age25wRCPlus) * 100
+
+# Sum the percent differences
+total_percent_diff <- sum(all_level_minors_w_MLBValue25$percent_diff_age25wRCPlus, na.rm = TRUE)
+
+samplesize <- nrow(all_level_minors_w_MLBValue25)
+
+# Print the result
+total_percent_diff/74
+
+checkingforoutliers25 <- all_level_minors_w_MLBValue25 %>%
+  select(Name, percent_diff_age25wRCPlus, age25wRCPlus)
+head(checkingforoutliers25)
+```
+```{r}
+plot(stepwise_model252, which = 1)
+```
+
+
+```{r}
+IndivPlayerProj <- final_combined_stats %>%
+  filter(PlayerID == 671732)
+
+IndivPlayerProj <- predict(stepwise_model25, newdata = IndivPlayerProj)
+IndivPlayerProj
+```
+
+
+
+
+```{r}
+# Install and load the rstanarm package if you haven't already
+# install.packages("rstanarm")
+library(rstanarm)
+
+# Fit the model using stan_lm
+age25model_test_higher_order_stan <- stan_lm(
+  formula = age25wRCPlus ~ (total_Age_Grade_avg + total_PA_Basic  + 
+                            total_BBRate_avg + total_KRate_avg + 
+                            total_BABIP_avg + total_ExitVelo95_avg)^3, 
+  data = all_level_minors_w_MLBValue25,
+  prior = R2(location = 0.5, what = "mean"), # Set a prior, adjust as necessary
+  prior_intercept = normal(0, 10), # Prior for intercept
+  chains = 4, # Number of Markov chains
+  iter = 2000, # Number of iterations per chain
+  seed = 123 # Seed for reproducibility
+)
+
+# Print the summary of the fitted model
+summary(age25model_test_higher_order_stan)
+
+```
+
+
+
+
+```{r}
+# Load necessary packages
+library(rstanarm)
+library(bayesplot)
+
+# Trace plots to check convergence
+mcmc_trace(as.matrix(age25model_test_higher_order_stan))
+
+# Posterior density plots
+mcmc_areas(as.matrix(age25model_test_higher_order_stan), pars = c(
+  "(Intercept)", "total_Age_Grade_avg", "total_PA_Basic", "total_BBRate_avg", 
+  "total_KRate_avg", "total_BABIP_avg", "total_ExitVelo95_avg",
+  "total_Age_Grade_avg:total_PA_Basic", "total_Age_Grade_avg:total_BBRate_avg"
+))
+
+# Pairs plot to check for correlations and convergence issues
+mcmc_pairs(as.matrix(age25model_test_higher_order_stan), pars = c(
+  "(Intercept)", "total_Age_Grade_avg", "total_PA_Basic", "total_BBRate_avg", 
+  "total_KRate_avg", "total_BABIP_avg", "total_ExitVelo95_avg"
+))
+
+```
+
+```{r}
+posterior_summary <- summary(age25model_test_higher_order_stan)
+
+# Extract the coefficients summary as a data frame
+summary_table <- as.data.frame(posterior_summary)
+```
+
+
+
